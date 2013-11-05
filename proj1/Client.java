@@ -3,101 +3,83 @@ import java.net.*;
 import java.util.*;
 
 public class Client {
+    public static final int SIZE_HEADER = 12;
+    public static final int SIZE_INT = 4;
+
     public static final String HOST = "bicycle.cs.washington.edu";
     public static final int PORT = 12235;
 
     public static void main(String[] args) throws IOException {
-	// set up server thread to receive responses
+	// step a
+	byte[] resA = stepA();
+	int num = PacketUtil.extractInt(resA, SIZE_HEADER);
+	int len = PacketUtil.extractInt(resA, SIZE_HEADER + 4);
+	int udpPort = PacketUtil.extractInt(resA, SIZE_HEADER + 8);
+	int secretA = PacketUtil.extractInt(resA, SIZE_HEADER + 12);
+	System.out.println("STEP A RESPONSE: " + Arrays.toString(resA));
+	System.out.println("   num:    " + num);
+	System.out.println("   len:    " + len);
+	System.out.println("   port:   " + udpPort);
+	System.out.println("   secret: " + secretA);
+	System.out.println();
+
+	// step b
+	stepB(num, len, udpPort, secretA);
+	
+    }
+
+    // runs stepA, returning the received packet's data
+    public static byte[] stepA() throws IOException {
+	System.out.println("Performing STEP A");
 	DatagramSocket socket = new DatagramSocket(5432);
-	ServerThread server = new ServerThread(socket);
-	server.start();
-
-	byte[] buf;
-	Scanner console = new Scanner(System.in);
-	String in;
-
-	System.out.println("Type anything to send");
-	while (!(in = console.nextLine()).equalsIgnoreCase("exit")) {
-	    byte[] psecret0 = {0, 0, 0, 0};
-	    buf = packetize(toByteArray("hello world"), psecret0);
-	    printPacket(buf);
-	    InetAddress address = InetAddress.getByName(HOST);
-	    System.out.println(address);
-	    DatagramPacket packet = new DatagramPacket(buf, buf.length, address, PORT);
-	    socket.send(packet);
-	    System.out.println("Sending a message to " + HOST + ":" + PORT + "...");
-	}
-	server.stopListening();
+	socket.setSoTimeout(5000);
+	byte[] psecret0 = {0, 0, 0, 0};
+	byte[] bufOut = PacketUtil.packetize(PacketUtil.toByteArray("hello world"),
+					  psecret0, "a1");
+	InetAddress address = InetAddress.getByName(HOST);
+	DatagramPacket out = new DatagramPacket(bufOut, bufOut.length, address, PORT);
+	socket.send(out);
+	byte[] bufIn = new byte[SIZE_HEADER + 4 * SIZE_INT];
+	DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
+	socket.receive(in);
 	socket.close();
-	console.close();
+	return bufIn;
     }
+    
+    public static void stepB(int num, int len,
+			     int udpPort, int secretA) throws IOException {
+	DatagramSocket socket = new DatagramSocket(udpPort);
+	socket.setSoTimeout(500);
 
-    public static byte[] toByteArray(String s) {
-	byte[] res = new byte[s.length() + 1];
-	for (int i = 0; i < s.length(); i++)
-	    res[i] = (byte) s.charAt(i);
-	res[s.length()] = '\0'; // null-terminate
-	return res;
-    }
+	InetAddress address = InetAddress.getByName(HOST);
 
-    public static void printPacket(byte[] packet) {
-	if (packet.length < 12) throw new IllegalArgumentException();
-	System.out.print("   payload_len:");
-	for (int i = 0; i < 4; i++)
-	    System.out.print(" " + packet[i]);
-	System.out.println();
-	System.out.print("   psecret:");
-	for (int i = 0; i < 4; i++)
-	    System.out.print(" " + packet[4 + i]);
-	System.out.println("   step: " + packet[8] + " " + packet[9]);
-	System.out.println("    id: " + packet[10] + " " + packet[11]);
-	System.out.print("    payload:");
-	for (int i = 12; i < packet.length; i++)
-	    System.out.print(" " + packet[i]);
-	System.out.println();
-    }
+	for (int i = 0; i < num; i++) {
+	    byte[] payload = new byte[SIZE_INT + len];
+	    byte[] id = PacketUtil.toByteArray(i);
+	    for (int j = 0; j < id.length; j++)
+		payload[j] = id[j];
+	    byte[] bufOut = PacketUtil.packetize(payload, PacketUtil.toByteArray(secretA), "b1");
+	    byte[] bufIn = new byte[SIZE_HEADER + SIZE_INT];
 
-    public static byte[] packetize(byte[] payload, byte[] prevSecret) {
-	if (prevSecret.length != 4) throw new IllegalArgumentException();
-	int length = 12 + payload.length;
-	byte[] packet = new byte[length + (4 - length % 4) % 4];
-	insertHeader(packet, payload.length, "a1", prevSecret);
-	for (int i = 0; i < payload.length; i++)
-	    packet[12 + i] = payload[i];
-	return packet;
-    }
+	    DatagramPacket out = new DatagramPacket(bufOut, bufOut.length,
+						    address, udpPort);
+	    DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
 
-    // inserts a 12 byte header at the beginning of 'packet'
-    // throws IllegalArgumentException if header will not fit
-    public static void insertHeader(byte[] packet, int trueLength, 
-				    String step, byte[] prevSecret) {
-	if (packet.length < 12)
-	    throw new IllegalArgumentException();
-
-	// 4-byte length
-	byte[] length = toByteArray(trueLength);
-	for (int i = 0; i < 4; i++)
-	    packet[i] = length[i];
-
-	// 4-byte prev secret
-	for (int i = 0; i < 4; i++)
-	    packet[4 + i] = prevSecret[i];
-
-	// 2-byte step number
-	packet[8] = (byte) (step.charAt(0) - 'a');
-	packet[9] = (byte) Integer.parseInt("" + step.charAt(1));
-
-	// 2-byte student number;
-	packet[10] = (byte) 0x1;
-	packet[11] = (byte) 0xD8;
-    }
-
-    public static byte[] toByteArray(int n) {
-	byte[] res = new byte[4];
-	for (int i = 0; i < 4; i++) {
-	    res[4 - 1 - i] = (byte) n;
-	    n = n >> 8;
+	    for (int j = 0; j < 4; j++) {
+		System.out.println("sending to " + out.getAddress() + ":" + out.getPort() + "...");
+		socket.send(out);
+		PacketUtil.printPacket(out.getData());
+		System.out.print("    raw data: ");
+		System.out.println(Arrays.toString(out.getData()));
+		System.out.println();
+		try {
+		    socket.receive(in);
+		    System.out.println("SUCCESS");
+		} catch (SocketTimeoutException e) {
+		    System.out.println("timeout");
+		}
+	    }
 	}
-	return res;
+	socket.close();
     }
 }
