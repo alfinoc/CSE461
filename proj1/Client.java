@@ -16,7 +16,8 @@ public class Client {
 	int len = PacketUtil.extractInt(resA, SIZE_HEADER + 4);
 	int udpPort = PacketUtil.extractInt(resA, SIZE_HEADER + 8);
 	int secretA = PacketUtil.extractInt(resA, SIZE_HEADER + 12);
-	System.out.println("STEP A RESPONSE: " + Arrays.toString(resA));
+	System.out.println("STEP A RESPONSE: ");
+	PacketUtil.printBytes(resA, 0, resA.length);
 	System.out.println("   num:    " + num);
 	System.out.println("   len:    " + len);
 	System.out.println("   port:   " + udpPort);
@@ -68,10 +69,9 @@ public class Client {
 	    for (int j = 0; j < 4; j++) {
 		System.out.println("sending to " + out.getAddress() + ":" + out.getPort() + "...");
 		socket.send(out);
+		
 		PacketUtil.printPacket(out.getData());
-		System.out.print("    raw data: ");
-		System.out.println(Arrays.toString(out.getData()));
-		System.out.println();
+
 		try {
 		    socket.receive(in);
 		    System.out.println("SUCCESS");

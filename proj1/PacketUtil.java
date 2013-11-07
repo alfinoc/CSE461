@@ -31,22 +31,35 @@ public class PacketUtil {
 
     // prints the contents of the packet. if the packet is too small
     // to have the header used in this project, throws IllegalArgumentException
-    // otherwise, each byte is
+    // otherwise, each field is printed
     public static void printPacket(byte[] packet) {
+	System.out.println("PACKET CONTENTS");
         if (packet.length < SIZE_HEADER) throw new IllegalArgumentException();
-        System.out.print("   payload_len:");
-        for (int i = 0; i < 4; i++)
-            System.out.print(" " + packet[i]);
-        System.out.println();
-        System.out.print("   psecret:");
-        for (int i = 0; i < 4; i++)
-            System.out.print(" " + packet[4 + i]);
-        System.out.println("   step: " + packet[8] + " " + packet[9]);
+        System.out.println("   payload_len: " + extractInt(packet, 0));
+        System.out.println("   psecret: " + extractInt(packet, 4));
+        System.out.print("   step: " + packet[8] + " " + packet[9] + " ");
         System.out.println("   id: " + packet[10] + " " + packet[11]);
-        System.out.print("   payload:");
-        for (int i = 12; i < packet.length; i++)
-            System.out.print(" " + packet[i]);
+        System.out.printf("   payload + padding (%d bytes):\n",
+			 packet.length - SIZE_HEADER);
+	printBytes(packet, 12, packet.length);
+	System.out.println("   raw data:");
+	printBytes(packet, 0, packet.length);
         System.out.println();
+    }
+
+    // prints the contents of a from indices 'start' to 'end' exclusive, 4
+    // bytes per line, space separated, in hexidecimal.
+    public static void printBytes(byte[] a, int start, int end) {
+	if (start < 0 || start > end || end > a.length)
+	    throw new IllegalArgumentException();
+
+	for (int i = start; i < end; i++) {
+	    if (i % 4 == 0)
+		System.out.print(i + "\t| ");
+	    System.out.printf("%x ", a[i]);
+	    if (i % 4 == 3)
+		System.out.println();
+	}
     }
 
     // returns a byte[] "packet" with an appropriate header based on
