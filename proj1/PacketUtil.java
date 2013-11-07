@@ -42,8 +42,8 @@ public class PacketUtil {
         System.out.printf("   payload + padding (%d bytes):\n",
 			 packet.length - SIZE_HEADER);
 	printBytes(packet, 12, packet.length);
-	System.out.println("   raw data:");
-	printBytes(packet, 0, packet.length);
+	// System.out.println("   raw data:");
+	// printBytes(packet, 0, packet.length);
         System.out.println();
     }
 
@@ -98,7 +98,7 @@ public class PacketUtil {
             packet[4 + i] = prevSecret[i];
 
         // 2-byte step number
-        packet[8] = (byte) (step.charAt(0) - 'a');
+        packet[8] = (byte) 0;
         packet[9] = (byte) Integer.parseInt("" + step.charAt(1));
 
         // 2-byte student number;
