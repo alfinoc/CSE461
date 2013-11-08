@@ -10,6 +10,7 @@ public class Client {
 
     public static void main(String[] args) throws IOException {
 	// step a
+	System.out.println("Performing STEP A");
 	byte[] resA = stepA();
 	int num = PacketUtil.extractInt(resA, SIZE_HEADER);
 	int len = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT);
@@ -17,77 +18,76 @@ public class Client {
 	int secretA = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT * 3);
 
 	// step b
+	System.out.print("Performing STEP B");
 	byte[] resB = stepB(num, len, udpPort, secretA);
 	int tcpPort = PacketUtil.extractInt(resB, SIZE_HEADER);
 	int secretB = PacketUtil.extractInt(resB, SIZE_HEADER + SIZE_INT);
 
 	// step c
+	System.out.println("Performing STEP C");
 	Socket tcpSocket = new Socket(HOST, tcpPort);
 	byte[] resC = stepC(secretB, tcpSocket);
-	PacketUtil.printPacket(resC);
 	int num2 = PacketUtil.extractInt(resC, SIZE_HEADER);
 	int len2 = PacketUtil.extractInt(resC, SIZE_HEADER + SIZE_INT);
 	int secretC = PacketUtil.extractInt(resC, SIZE_HEADER + SIZE_INT * 2);
 	byte c = resC[SIZE_HEADER + SIZE_INT * 3];
 
-	// step d	
-	stepD(num2, len2, c, secretC, tcpSocket);
+	// step d
+	System.out.println("Performing STEP D");
+	byte[] resD = stepD(num2, len2, c, secretC, tcpSocket);
+	int secretD = PacketUtil.extractInt(resD, SIZE_HEADER);
+
+	System.out.println();
+	printSecrets(secretA, secretB, secretC, secretD);
     }
 
-    public static void stepD(int num, int len, byte c,
-			     int secretC, Socket socket) throws IOException {
-	System.out.println("num: " + num);
-	System.out.println("len: " + len);
-	System.out.println("c: " + c);
+    // prints the four secrets 'a' - 'd', one per line
+    public static void printSecrets(int a, int b, int c, int d) {
+	System.out.println("secret a: " + a);
+	System.out.println("secret b: " + b);
+	System.out.println("secret c: " + c);
+	System.out.println("secret d: " + d);
+    }
 
+    // runs step d, returning the received packets data
+    // step d involves sending 'num' payloads of length 'len' full of byte 'c'
+    // on 'socket'. 'secretC' is sent in the header.
+    public static byte[] stepD(int num, int len, byte c,
+			     int secretC, Socket socket) throws IOException {
 	byte[] payload = new byte[len];
 	Arrays.fill(payload, c);
+	byte[] buf;
 
 	// send 'num' payloads
 	for (int i = 0; i < num; i++) {
-	    byte[] buf = PacketUtil.packetize(payload, PacketUtil.toByteArray(secretC), "d1");
+	    buf = PacketUtil.packetize(payload, PacketUtil.toByteArray(secretC), "d1");
 	    socket.getOutputStream().write(buf);
 	}
 
 	// read response
-	ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	InputStream in = socket.getInputStream();
-	byte[] buf = new byte[SIZE_HEADER + SIZE_INT];
-        int s;
-        int total = 0;
-        while (total < 4 && (s = in.read(buf)) != -1) {
-            total += s;
-            baos.write(buf, 0, s);
-        }
-	PacketUtil.printPacket(buf);
-	
+	buf = new byte[SIZE_HEADER + SIZE_INT];
+	PacketUtil.read(socket, buf);
 	socket.close();
+	return buf;
     }
 
-
+    // runs step c, returning the received packet's data
+    // step c involves sending openning a connection on 'socket' to stepC and receiving
+    // a 16-byte message.
     public static byte[] stepC(int secretB, Socket socket) throws IOException {
-	InputStream in = socket.getInputStream();
-	ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
 	byte[] buf = new byte[SIZE_HEADER + 4 * SIZE_INT];
-	int s;
-	int total = 0;
-	while (total < 16 && (s = in.read(buf)) != -1) {
-	    total += s;
-	    baos.write(buf, 0, s);
-	}
-
-	return baos.toByteArray();
+	PacketUtil.read(socket, buf);
+	return buf;
     }
 
     // runs stepA, returning the received packet's data
+    // step a involves sending a "hello world" payload to 'HOST' on port 12235
     public static byte[] stepA() throws IOException {
-	System.out.println("Performing STEP A");
 	DatagramSocket socket = new DatagramSocket();
 	socket.setSoTimeout(5000);
 	byte[] psecret0 = {0, 0, 0, 0};
 	byte[] bufOut = PacketUtil.packetize(PacketUtil.toByteArray("hello world"),
-					  psecret0, "a1");
+					     psecret0, "a1");
 	InetAddress address = InetAddress.getByName(HOST);
 	DatagramPacket out = new DatagramPacket(bufOut, bufOut.length, address, 12235);
 	socket.send(out);
@@ -97,10 +97,12 @@ public class Client {
 	socket.close();
 	return bufIn;
     }
-    
+
+    // runs set b, returning the received packet's data
+    // step b involves sending 'num' udp packets, each with payload length len + 4 to
+    // 'HOST' on 'udpPort', with 'secretA' in the header
     public static byte[] stepB(int num, int len,
 			       int udpPort, int secretA) throws IOException {
-	System.out.println("Performing STEP B");
 	DatagramSocket socket = new DatagramSocket();
 	socket.setSoTimeout(500);
 
@@ -119,19 +121,18 @@ public class Client {
 	    DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
 
 	    boolean timeout = true;
-	    System.out.print("   sending " + i + " : ");
 	    while (timeout) {
 		socket.send(out);
 		try {
 		    socket.receive(in);
-		    System.out.println("SUCCESS");
 		    timeout = false;
 		} catch (SocketTimeoutException e) {
 		    timeout = true;
-		    System.out.print(". ");
 		}
+		System.out.print(".");
 	    }
 	}
+	System.out.println();
 	byte[] bufIn = new byte[SIZE_HEADER + 2 * SIZE_INT];
 	DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
 	socket.receive(in);

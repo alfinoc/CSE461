@@ -1,3 +1,7 @@
+import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.net.Socket;
 import java.util.Arrays;
 
 public class PacketUtil {
@@ -34,7 +38,8 @@ public class PacketUtil {
     // otherwise, each field is printed
     public static void printPacket(byte[] packet) {
 	System.out.println("PACKET CONTENTS");
-        if (packet.length < SIZE_HEADER) throw new IllegalArgumentException();
+        if (packet.length < SIZE_HEADER) throw new IllegalArgumentException(
+		       "packet length is only " + packet.length + " (bytes)");
         System.out.println("   payload_len: " + extractInt(packet, 0));
         System.out.println("   psecret: " + extractInt(packet, 4));
         System.out.print("   step: " + packet[8] + " " + packet[9] + " ");
@@ -115,5 +120,24 @@ public class PacketUtil {
             n = n >> 8;
         }
         return res;
+    }
+
+    // reads buf.length bytes from 'socket' into 'buf', returning true if
+    // all bytes are read in, and false if an error occurred or 'buf' was
+    // not filled socket must be connected
+    public static boolean read(Socket socket, byte[] buf) {
+	try {
+	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    InputStream in = socket.getInputStream();
+	    int s;
+	    int total = 0;
+	    while (total < buf.length - SIZE_HEADER && (s = in.read(buf)) != -1) {
+		total += s;
+		baos.write(buf, 0, s);
+	    }
+	    return total == buf.length;
+	} catch (Exception e) {
+	    return false;
+	}
     }
 }
