@@ -58,12 +58,12 @@ public class PacketUtil {
     // 'prevSecret' and 'step' leading the 'payload'. packet is padded
     // to four-bytes
     public static byte[] packetize(byte[] payload, byte[] prevSecret,
-                                   String step) {
+                                   String step, int id) {
         if (prevSecret.length != 4) throw new IllegalArgumentException();
         int length = SIZE_HEADER + payload.length;
         byte[] packet = new byte[length +
                                  (SIZE_INT - length % SIZE_INT) % SIZE_INT];
-        insertHeader(packet, payload.length, step, prevSecret);
+        insertHeader(packet, payload.length, step, prevSecret, id);
         for (int i = 0; i < payload.length; i++)
             packet[12 + i] = payload[i];
         return packet;
@@ -72,7 +72,7 @@ public class PacketUtil {
     // inserts a 12 byte header at the beginning of 'packet'
     // throws IllegalArgumentException if header will not fit
     public static void insertHeader(byte[] packet, int trueLength,
-                                    String step, byte[] prevSecret) {
+                                String step, byte[] prevSecret, int id) {
         if (packet.length < SIZE_HEADER)
             throw new IllegalArgumentException();
 
@@ -90,8 +90,10 @@ public class PacketUtil {
         packet[9] = (byte) Integer.parseInt("" + step.charAt(1));
 
         // 2-byte student number;
-        packet[10] = (byte) 0x1;
-        packet[11] = (byte) 0xD8;
+        byte[] idBytes = toByteArray(id);
+
+        packet[10] = idBytes[2];
+        packet[11] = idBytes[3];
     }
 
     // reads buf.length bytes from 'socket' into 'buf', returning true if

@@ -27,12 +27,14 @@ public class Server {
             } catch (IllegalArgumentException e) {
                // silently refuse to respond to malformed packet
                System.out.println("   failed step a1");
+               e.printStackTrace();
             }
             System.out.println("Enter \"exit\" to gently kill server.");
             System.out.println("Enter anything else to continue.");
          } catch (Exception e) {
             System.err.println("Exception. Terminating reception.");
             System.err.println(e.getMessage());
+            e.printStackTrace();
          }
       } while (!console.next().equalsIgnoreCase("exit"));
       socket.close();

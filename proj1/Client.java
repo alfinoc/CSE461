@@ -26,14 +26,14 @@ public class Client {
         int len = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT);
         int udpPort = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT * 2);
         int secretA = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT * 3);
-        PacketUtil.printPacket(resA);
-/*
+
         // step b
         System.out.print("Performing STEP B");
         byte[] resB = stepB(num, len, udpPort, secretA);
         int tcpPort = PacketUtil.extractInt(resB, SIZE_HEADER);
         int secretB = PacketUtil.extractInt(resB, SIZE_HEADER + SIZE_INT);
-
+        PacketUtil.printPacket(resB);
+/*
         // step c
         System.out.println("Performing STEP C");
         Socket tcpSocket = new Socket(HOST, tcpPort);

@@ -12,11 +12,10 @@ public class Validator {
    // id bytes must be between 0 - 999
    // pre: received has length % 4 == 1 and has a 0xF in final position
    // client can still imitate this pattern, but there's no way for me to find
-   // out how many bytes i actually received
+   // out how many bytes i actually received so this is the best i can do
    public static boolean validHeader(int payloadLen, int pSecret, int step,
                                      byte[] received) {
-      if (received.length < SIZE_HEADER || received.length % 4 != 1
-            || 0xF != received[received.length - 1])
+      if (received.length < SIZE_HEADER || 0xF != received[received.length - 1])
          return false;
       
       // validate length
@@ -37,7 +36,7 @@ public class Validator {
       int id = PacketUtil.extractInt(twoByteBuff, 0);
       boolean passId = 0 <= id && id <= 999;
 
-      System.out.println("header pass: " + (passLen && passSecret && passStep && passId));
+      //System.out.println("   header pass: " + (passLen && passSecret && passStep && passId));
       return passLen && passSecret && passStep && passId;
    }
 }

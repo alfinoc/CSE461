@@ -9,6 +9,7 @@ public class ServerThread extends Thread {
 
    private Random rand;
    protected DatagramSocket socket = null;
+   protected Socket tcp;
    protected int id;
    protected InetAddress clientAddress;
    protected int clientPort;
@@ -41,12 +42,13 @@ public class ServerThread extends Thread {
       rand = new Random();
       while (socket == null) {
          try {
-            // creates a new socket on whatever 
+            // creates a new socket on some random port
             socket = new DatagramSocket();
          } catch (Exception e) {
             System.out.println(e.getMessage());
          }
       }
+      socket.setSoTimeout(10000);
    }
 
    // Forks a new ServerThread with 'name'.
@@ -62,8 +64,10 @@ public class ServerThread extends Thread {
       System.out.println("   host port:   " + socket.getLocalPort());
       System.out.println("   client port: " + clientPort);
       try {
-         int secretA = stepA();
-         stepB(secretA);
+         byte[] sent = stepA();
+         int secretB = stepB(PacketUtil.extractInt(sent, SIZE_HEADER),
+                             PacketUtil.extractInt(sent, SIZE_HEADER + SIZE_INT),
+                             PacketUtil.extractInt(sent, SIZE_HEADER + SIZE_INT * 3));
       } catch (IOException e) {
          System.err.println(e.getMessage());
       }
@@ -73,8 +77,8 @@ public class ServerThread extends Thread {
 
    // Performs step A, sending the server response with various parameters for
    // step B. Returns the randomly generated secretA.
-   public int stepA() throws IOException {
-      byte[] num = PacketUtil.toByteArray(rand.nextInt(100));
+   public byte[] stepA() throws IOException {
+      byte[] num = PacketUtil.toByteArray(rand.nextInt(50));
       byte[] len = PacketUtil.toByteArray(rand.nextInt(100));
       byte[] udpPort = PacketUtil.toByteArray(socket.getLocalPort());
       int firstSecret = rand.nextInt();
@@ -92,16 +96,75 @@ public class ServerThread extends Thread {
          payload[i + SIZE_INT * 3] = secretA[i];
       
       // send response with parameters for step b
-      byte[] packet = PacketUtil.packetize(payload, (new byte[SIZE_INT]), "a1");
-      PacketUtil.printPacket(packet);
+      byte[] packet = PacketUtil.packetize(payload, (new byte[SIZE_INT]), "a1", id);
       DatagramPacket out = new DatagramPacket(packet, packet.length,
                                               clientAddress, clientPort);
       socket.send(out);
-      return firstSecret;
+      return packet;
    }
 
-   public void stepB(int secretA) throws IOException {
-      
+   public int stepB(int num, int len, int secretA) throws IOException {
+      int payloadSize = len + SIZE_INT;
+      int packetSize = SIZE_HEADER + payloadSize;
+      packetSize += (SIZE_INT - packetSize % SIZE_INT) % SIZE_INT;
+      byte[] bufIn = new byte[packetSize + 1];
+      Arrays.fill(bufIn, (byte) 0xF);
+
+      boolean haveFailed = false;  // to ensure we fail at least once     
+      for (int i = 0; i < num;) {
+         System.out.print(".");
+         DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
+         socket.receive(in);
+         clientAddress = in.getAddress();
+         clientPort = in.getPort();
+
+         // validate received packet
+         if (!Validator.validHeader(payloadSize, secretA, 1, bufIn))
+            throw new IllegalArgumentException();
+         for (int j = SIZE_HEADER + SIZE_INT; j < bufIn.length - 1; j++)
+            if (bufIn[j] != 0)
+               throw new IllegalArgumentException();
+         int seqNum = PacketUtil.extractInt(bufIn, SIZE_HEADER);
+         if (seqNum != i)
+            throw new IllegalStateException();
+
+         // randomly fail to acknowledge some packets, ensuring failure on
+         // the last packet if we have not yet failed
+         if ((rand.nextDouble() < 0.2) || (i == num - 1 && !haveFailed)) {
+            haveFailed = true;
+         } else {
+            byte[] payload = PacketUtil.toByteArray(i);
+            byte[] bufOut = PacketUtil.packetize(payload,
+                                    PacketUtil.toByteArray(secretA), "b1", id);
+            DatagramPacket out = new DatagramPacket(bufOut, bufOut.length,
+                                                    clientAddress, clientPort);
+            socket.send(out);
+            i++;
+         }
+
+         // reset buffer to catch improperly sized packets
+         Arrays.fill(bufIn, (byte) 0xF);
+      }
+      System.out.println();
+
+      // open the tcp socket
+
+
+      // send final response
+      byte[] payload = new byte[SIZE_INT * 2];
+      int nextSecret = rand.nextInt();
+      byte[] secretB = PacketUtil.toByteArray(nextSecret);
+      byte[] tcpPort = PacketUtil.toByteArray(4);  //tcp.getLocalPort());
+      for (int i = 0; i < tcpPort.length; i++)
+         payload[i] = tcpPort[i];
+      for (int i = 0; i < secretB.length; i++)
+         payload[SIZE_INT + i] = secretB[i];
+      byte[] bufOut = PacketUtil.packetize(payload, PacketUtil.toByteArray(secretA),
+                                           "b2", id);
+      DatagramPacket out = new DatagramPacket(bufOut, bufOut.length,
+                                              clientAddress, clientPort);
+      socket.send(out);
+      return nextSecret;
    }
 
    // Closes the socket used by this thread if such a socket exists.
