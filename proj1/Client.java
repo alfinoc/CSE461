@@ -14,7 +14,7 @@ import java.net.*;
 import java.util.*;
 
 public class Client {
-    public static final String HOST = "bicycle.cs.washington.edu";
+    public static final String HOST = "localhost";
     public static final int SIZE_HEADER = 12;
     public static final int SIZE_INT = 4;
 
@@ -26,7 +26,8 @@ public class Client {
         int len = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT);
         int udpPort = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT * 2);
         int secretA = PacketUtil.extractInt(resA, SIZE_HEADER + SIZE_INT * 3);
-
+        PacketUtil.printPacket(resA);
+/*
         // step b
         System.out.print("Performing STEP B");
         byte[] resB = stepB(num, len, udpPort, secretA);
@@ -49,6 +50,7 @@ public class Client {
 
         System.out.println();
         printSecrets(secretA, secretB, secretC, secretD);
+*/
     }
 
     // prints the four secrets 'a' - 'd', one per line
