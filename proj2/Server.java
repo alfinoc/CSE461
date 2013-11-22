@@ -20,7 +20,6 @@ public class Server {
             DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
             socket.receive(in);
 
-            // fork a new server thread
             try {
                ServerThread newThread = new ServerThread(in);
                newThread.run();
@@ -29,6 +28,7 @@ public class Server {
                System.out.println("   failed step a1");
                e.printStackTrace();
             }
+
             System.out.println("Enter \"exit\" to gently kill server.");
             System.out.println("Enter anything else to continue.");
          } catch (Exception e) {
@@ -36,7 +36,8 @@ public class Server {
             System.err.println(e.getMessage());
             e.printStackTrace();
          }
-      } while (!console.next().equalsIgnoreCase("exit"));
-      socket.close();
+*/
+      } while (true);
+      //socket.close();
    }
 }

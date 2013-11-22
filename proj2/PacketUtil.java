@@ -98,7 +98,7 @@ public class PacketUtil {
 
     // reads buf.length bytes from 'socket' into 'buf', returning true if
     // all bytes are read in, and false if an error occurred or 'buf' was
-    // not filled socket must be connected
+    // not filled. socket must be connected
     public static boolean read(Socket socket, byte[] buf) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -109,6 +109,7 @@ public class PacketUtil {
                 total += s;
                 baos.write(buf, 0, s);
             }
+            System.out.println(total);
             return total == buf.length;
         } catch (Exception e) {
             return false;

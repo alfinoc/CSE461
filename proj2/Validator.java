@@ -15,7 +15,7 @@ public class Validator {
    // out how many bytes i actually received so this is the best i can do
    public static boolean validHeader(int payloadLen, int pSecret, int step,
                                      byte[] received) {
-      if (received.length < SIZE_HEADER || 0xF != received[received.length - 1])
+      if (received.length < SIZE_HEADER )
          return false;
       
       // validate length

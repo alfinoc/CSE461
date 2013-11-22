@@ -7,8 +7,11 @@ public class ServerThread extends Thread {
    public static final int SIZE_INT = 4;
    public static final int MAX_PORT = 65535;
 
+   // info about the client that this thread is communicating with
    protected InetAddress clientAddress;
    protected int clientPort;
+
+   // all sockets used by this thread
    protected DatagramSocket udpSocket;
    protected ServerSocket tcpServer;
    protected Socket tcpSocket;
@@ -16,7 +19,7 @@ public class ServerThread extends Thread {
    private Random rand;
    protected TransmissionRecord record;
 
-   // Forks a new thread based on the Step A initial client datagram 'initial'.
+   // Creates a new thread based on the Step A initial client datagram 'initial'.
    // If the contents of 'initial' are in any way invalid according to the
    // protocol, an IllegalArgumentException is thrown. Otherwise, a new socket
    // is opened on an available port for subsequent transmission with client.
@@ -47,13 +50,13 @@ public class ServerThread extends Thread {
       udpSocket.setSoTimeout(10000);
    }
 
-   // Forks a new ServerThread with 'name'.
+   // Creates a new ServerThread with 'name'.
    public ServerThread(String name) throws IOException {
       super(name);
    }
 
    // Performs each of the four steps to the protocol, based on step a parameters
-   // provided by the initial packet used to fork this thread.
+   // provided by the initial packet used to create this thread.
    public void run() {
       System.out.println("Starting a new thread!");
       System.out.println("   student id:  " + record.id);
@@ -66,8 +69,8 @@ public class ServerThread extends Thread {
          udpSocket.close();
 
          stepC();
-         tcpSocket.close();
          stepD();
+         tcpSocket.close();
 
          record.print();
 
@@ -78,7 +81,7 @@ public class ServerThread extends Thread {
    }
 
    // Performs step A, sending the server response with various parameters for
-   // step B. Returns the randomly generated secretA.
+   // step B. Stores results in record.
    public void stepA() throws IOException {
       byte[] num = PacketUtil.toByteArray(record.num1 = rand.nextInt(50));
       byte[] len = PacketUtil.toByteArray(record.len1 = rand.nextInt(100));
@@ -104,12 +107,13 @@ public class ServerThread extends Thread {
       udpSocket.send(out);
    }
 
+   // Performs step B, randomly failing to acknowledge some of the received packets
+   // updSocket must be initialized. Stores results in record.
    public void stepB() throws IOException {
       int payloadSize = record.len1 + SIZE_INT;
       int packetSize = SIZE_HEADER + payloadSize;
       packetSize += (SIZE_INT - packetSize % SIZE_INT) % SIZE_INT;
-      byte[] bufIn = new byte[packetSize + 1];
-      Arrays.fill(bufIn, (byte) 0xF);
+      byte[] bufIn = new byte[packetSize];
 
       boolean haveFailed = false;  // to ensure we fail at least once     
       for (int i = 0; i < record.num1;) {
@@ -142,22 +146,10 @@ public class ServerThread extends Thread {
             udpSocket.send(out);
             i++;
          }
-
-         // reset buffer to catch improperly sized packets
-         Arrays.fill(bufIn, (byte) 0xF);
       }
       System.out.println();
 
-      // open the tcpServer socket
-      boolean valid = false;
-      while (!valid) {
-         try {
-            tcpServer = new ServerSocket(rand.nextInt(MAX_PORT - 2000) + 2000);
-            valid = true;
-         } catch (Exception e) {
-            // keep trying as long as the randomly chosen port is not available
-         }
-      }
+      initTCPServer();
 
       // send final response
       byte[] payload = new byte[SIZE_INT * 2];
@@ -175,6 +167,22 @@ public class ServerThread extends Thread {
       udpSocket.send(out);
    }
 
+   // Initializes a tcp server on a random port, recording the appropriate fields of
+   // the record if successful.
+   private void initTCPServer() {
+      boolean valid = false;
+      while (!valid) {
+         try {
+            tcpServer = new ServerSocket(record.tcpPort = rand.nextInt(MAX_PORT - 2000) + 2000);
+            valid = true;
+         } catch (Exception e) {
+            // keep trying as long as the randomly chosen port is not available
+         }
+      }
+   }
+
+   // Performs step C, sending a single TCP packet to the client containing parameters
+   // for step D. Requires that the 'tcpServer' is initialized.
    public void stepC() throws IOException {
       tcpSocket = tcpServer.accept();
       tcpServer.close();
@@ -190,17 +198,37 @@ public class ServerThread extends Thread {
          bufOut[i + SIZE_INT] = len2[i];
       for (int i = 0; i < secretC.length; i++)
          bufOut[i + SIZE_INT * 2] = secretC[i];
-      bufOut[SIZE_INT * 3] = (byte) 'c';
+      bufOut[SIZE_INT * 3] = (byte) (record.c = (char) (byte) rand.nextInt());
 
       bufOut = PacketUtil.packetize(bufOut, PacketUtil.toByteArray(record.secretB),
                                     "c2", record.id);
       tcpSocket.getOutputStream().write(bufOut);
    }
 
+   // Performs step D, the reception of a random number of TCP payloads on the open
+   // tcpSocket. Requires that this socket is connected.
    public void stepD() throws IOException {
-      
+      int paddedLength = record.len2;
+      paddedLength += (SIZE_INT - paddedLength % SIZE_INT) % SIZE_INT;
+      byte[] bufIn = new byte[SIZE_HEADER + paddedLength];
+      for (int i = 0; i < record.num2; i++) {
+         if (!PacketUtil.read(tcpSocket, bufIn))
+            throw new IllegalArgumentException();
+         if (!Validator.validHeader(record.len2, record.secretC, 1, bufIn))
+            throw new IllegalArgumentException();
+         for (int j = 0; j < record.len2; j++)
+            if (bufIn[SIZE_HEADER + j] != (byte) record.c)
+               throw new IllegalArgumentException();
+      }
+      byte[] bufOut = PacketUtil.toByteArray(record.secretD = rand.nextInt());
+      byte[] packet = PacketUtil.packetize(bufOut, PacketUtil.toByteArray(record.secretC),
+                                           "d1", record.id);
+      tcpSocket.getOutputStream().write(packet);
    }
 
+   // A class for recording all of the fields associated with a full Server - Client
+   // exchange according to the protocol. The fields are filled in as the program
+   // executes, so if transmission terminates midway through, this record will be incomplete.
    private class TransmissionRecord {
       public int id;
 
@@ -221,6 +249,7 @@ public class ServerThread extends Thread {
       public int secretC;
       public int secretD;
 
+      // prints a report of the exchange
       public void print() {
          System.out.println("STEP A - B");
          System.out.println("   num1:    " + num1);
@@ -229,7 +258,7 @@ public class ServerThread extends Thread {
          System.out.println("STEP C - D");
          System.out.println("   num2:    " + num2);
          System.out.println("   len2:    " + len2);
-         System.out.println("   c:       " + c);
+         System.out.println("   c:     0d" + (int) c);
          System.out.println("   tcpPort: " + tcpPort);
          System.out.println("SECRETS:");
          System.out.println("   a:       " + secretA);

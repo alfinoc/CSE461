@@ -32,7 +32,6 @@ public class Client {
         byte[] resB = stepB(num, len, udpPort, secretA);
         int tcpPort = PacketUtil.extractInt(resB, SIZE_HEADER);
         int secretB = PacketUtil.extractInt(resB, SIZE_HEADER + SIZE_INT);
-        PacketUtil.printPacket(resB);
 
         // step c
         System.out.println("Performing STEP C");
@@ -43,9 +42,6 @@ public class Client {
         int secretC = PacketUtil.extractInt(resC, SIZE_HEADER + SIZE_INT * 2);
         byte c = resC[SIZE_HEADER + SIZE_INT * 3];
 
-        System.out.println((char) c);
-        tcpSocket.close();
-/*
         // step d
         System.out.println("Performing STEP D");
         byte[] resD = stepD(num2, len2, c, secretC, tcpSocket);
@@ -53,7 +49,6 @@ public class Client {
 
         System.out.println();
         printSecrets(secretA, secretB, secretC, secretD);
-*/
     }
 
     // prints the four secrets 'a' - 'd', one per line
