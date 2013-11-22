@@ -31,12 +31,12 @@ public class Validator {
       twoByteBuff[3] = received[SIZE_INT * 2 + 1];
       boolean passStep = step == PacketUtil.extractInt(twoByteBuff, 0);
 
+      // validate id
       twoByteBuff[2] = received[SIZE_INT * 2 + 2];
       twoByteBuff[3] = received[SIZE_INT * 2 + 3];
       int id = PacketUtil.extractInt(twoByteBuff, 0);
       boolean passId = 0 <= id && id <= 999;
 
-      //System.out.println("   header pass: " + (passLen && passSecret && passStep && passId));
       return passLen && passSecret && passStep && passId;
    }
 }

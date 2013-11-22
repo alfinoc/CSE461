@@ -33,7 +33,7 @@ public class Client {
         int tcpPort = PacketUtil.extractInt(resB, SIZE_HEADER);
         int secretB = PacketUtil.extractInt(resB, SIZE_HEADER + SIZE_INT);
         PacketUtil.printPacket(resB);
-/*
+
         // step c
         System.out.println("Performing STEP C");
         Socket tcpSocket = new Socket(HOST, tcpPort);
@@ -43,6 +43,9 @@ public class Client {
         int secretC = PacketUtil.extractInt(resC, SIZE_HEADER + SIZE_INT * 2);
         byte c = resC[SIZE_HEADER + SIZE_INT * 3];
 
+        System.out.println((char) c);
+        tcpSocket.close();
+/*
         // step d
         System.out.println("Performing STEP D");
         byte[] resD = stepD(num2, len2, c, secretC, tcpSocket);
