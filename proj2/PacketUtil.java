@@ -116,6 +116,20 @@ public class PacketUtil {
         }
     }
 
+    // returns the a new byte array resulting from adjoining each byte array
+    // in 'subarrays' back-to-back
+    public static byte[] adjoinByteArrays(byte[][] subarrays) {
+        int size = 0;
+        for (int i = 0; i < subarrays.length; i++)
+            size += subarrays[i].length;
+        byte[] res = new byte[size];
+        int fillIndex = 0;
+        for (int i = 0; i < subarrays.length; i++)
+            for (int j = 0; j < subarrays[i].length; j++)
+                res[fillIndex++] = subarrays[i][j];
+        return res;
+    }
+
     // prints the contents of the packet. if the packet is too small
     // to have the header used in this project, throws IllegalArgumentException
     // otherwise, each field is printed

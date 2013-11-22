@@ -1,8 +1,19 @@
+/*
+   Chris Alfino
+   1024472
+   CSE 461
+
+   The runnable class handles one Server <-> Client interaction according to the
+   project 2 specification. When created, a new thread is created and each of the
+   four steps is performed. If the protocol is violated, an IllegalArgumentException or
+   IllegalStateException is thrown and execution of this thread is terminated.
+*/
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
-public class ServerThread extends Thread {
+public class ServerThread implements Runnable {
    public static final int SIZE_HEADER = 12;
    public static final int SIZE_INT = 4;
    public static final int MAX_PORT = 65535;
@@ -18,13 +29,13 @@ public class ServerThread extends Thread {
 
    private Random rand;
    protected TransmissionRecord record;
+   public Thread thread;
 
    // Creates a new thread based on the Step A initial client datagram 'initial'.
    // If the contents of 'initial' are in any way invalid according to the
    // protocol, an IllegalArgumentException is thrown. Otherwise, a new socket
    // is opened on an available port for subsequent transmission with client.
    public ServerThread(DatagramPacket initial) throws IOException {
-      this("ServerThread");
       record = new TransmissionRecord();
 
       // validate client message for step a
@@ -48,20 +59,16 @@ public class ServerThread extends Thread {
       rand = new Random();
       udpSocket = new DatagramSocket();
       udpSocket.setSoTimeout(10000);
-   }
 
-   // Creates a new ServerThread with 'name'.
-   public ServerThread(String name) throws IOException {
-      super(name);
+      // create a new thread and start it up
+      thread = new Thread(this, "student id: " + record.id);
+      thread.start();
    }
 
    // Performs each of the four steps to the protocol, based on step a parameters
    // provided by the initial packet used to create this thread.
    public void run() {
-      System.out.println("Starting a new thread!");
-      System.out.println("   student id:  " + record.id);
-      System.out.println("   host port:   " + udpSocket.getLocalPort());
-      System.out.println("   client port: " + clientPort);
+      System.out.println("Starting thread with student id: " + record.id);
       try {
 
          stepA();
@@ -77,7 +84,7 @@ public class ServerThread extends Thread {
       } catch (IOException e) {
          System.err.println(e.getMessage());
       }
-      System.out.println("Closing the thread on host port: " + udpSocket.getLocalPort());
+      System.out.println("Closing the thread with student id: " + record.id);
    }
 
    // Performs step A, sending the server response with various parameters for
@@ -89,16 +96,8 @@ public class ServerThread extends Thread {
       record.secretA = rand.nextInt();
       byte[] secretA = PacketUtil.toByteArray(record.secretA);
 
-      // combine fields into payload buffer
-      byte[] payload = new byte[SIZE_INT * 4];
-      for (int i = 0; i < num.length; i++)
-         payload[i] = num[i];
-      for (int i = 0; i < len.length; i++)
-         payload[i + SIZE_INT] = len[i];
-      for (int i = 0; i < udpPort.length; i++)
-         payload[i + SIZE_INT * 2] = udpPort[i];
-      for (int i = 0; i < secretA.length; i++)
-         payload[i + SIZE_INT * 3] = secretA[i];
+      byte[][] fields = {num, len, udpPort, secretA};
+      byte[] payload = PacketUtil.adjoinByteArrays(fields);
       
       // send response with parameters for step b
       byte[] packet = PacketUtil.packetize(payload, (new byte[SIZE_INT]), "a1", record.id);
@@ -117,7 +116,6 @@ public class ServerThread extends Thread {
 
       boolean haveFailed = false;  // to ensure we fail at least once     
       for (int i = 0; i < record.num1;) {
-         System.out.print(".");
          DatagramPacket in = new DatagramPacket(bufIn, bufIn.length);
          udpSocket.receive(in);
          clientAddress = in.getAddress();
@@ -147,19 +145,16 @@ public class ServerThread extends Thread {
             i++;
          }
       }
-      System.out.println();
 
       initTCPServer();
 
       // send final response
-      byte[] payload = new byte[SIZE_INT * 2];
       record.secretB = rand.nextInt();
       byte[] secretB = PacketUtil.toByteArray(record.secretB);
       byte[] tcpPort = PacketUtil.toByteArray(tcpServer.getLocalPort());
-      for (int i = 0; i < tcpPort.length; i++)
-         payload[i] = tcpPort[i];
-      for (int i = 0; i < secretB.length; i++)
-         payload[SIZE_INT + i] = secretB[i];
+
+      byte[][] fields = {tcpPort, secretB};
+      byte[] payload = PacketUtil.adjoinByteArrays(fields);
       byte[] bufOut = PacketUtil.packetize(payload, PacketUtil.toByteArray(record.secretA),
                                            "b2", record.id);
       DatagramPacket out = new DatagramPacket(bufOut, bufOut.length,
@@ -190,16 +185,10 @@ public class ServerThread extends Thread {
       byte[] num2 = PacketUtil.toByteArray(record.num2 = rand.nextInt(50));
       byte[] len2 = PacketUtil.toByteArray(record.len2 = rand.nextInt(50));
       byte[] secretC = PacketUtil.toByteArray(record.secretC = rand.nextInt());
+      record.c = (char) (byte) rand.nextInt();
 
-      byte[] bufOut = new byte[SIZE_INT * 4];
-      for (int i = 0; i < num2.length; i++)
-         bufOut[i] = num2[i];
-      for (int i = 0; i < len2.length; i++)
-         bufOut[i + SIZE_INT] = len2[i];
-      for (int i = 0; i < secretC.length; i++)
-         bufOut[i + SIZE_INT * 2] = secretC[i];
-      bufOut[SIZE_INT * 3] = (byte) (record.c = (char) (byte) rand.nextInt());
-
+      byte[][] fields = {num2, len2, secretC, {(byte) record.c}};
+      byte[] bufOut = PacketUtil.adjoinByteArrays(fields);
       bufOut = PacketUtil.packetize(bufOut, PacketUtil.toByteArray(record.secretB),
                                     "c2", record.id);
       tcpSocket.getOutputStream().write(bufOut);
@@ -213,7 +202,7 @@ public class ServerThread extends Thread {
       byte[] bufIn = new byte[SIZE_HEADER + paddedLength];
       for (int i = 0; i < record.num2; i++) {
          if (!PacketUtil.read(tcpSocket, bufIn))
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("failed on i = " + i);
          if (!Validator.validHeader(record.len2, record.secretC, 1, bufIn))
             throw new IllegalArgumentException();
          for (int j = 0; j < record.len2; j++)
