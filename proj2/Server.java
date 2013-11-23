@@ -22,6 +22,7 @@ public class Server {
       Scanner console = new Scanner(System.in);
       DatagramSocket socket = new DatagramSocket(PORT);
       while (true) {
+         System.out.println("Server accepting Step A1 packets.");
          try {
             // receive packets on Step A's port, forking a new thread if
             // we receive a new packet on that socket.

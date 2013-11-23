@@ -1,3 +1,12 @@
+/*
+   Chris Alfino
+   1024472
+   CSE 461
+
+   This class contains one Validator method to validate packet headers according
+   to the protocol specification.
+*/
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -6,16 +15,15 @@ public class Validator {
    public static final int SIZE_HEADER = 12;
    public static final int SIZE_INT = 4;
 
-   // better be 12 bytes
-   // payloadLen better fit received inside 12 + receivedLength
-   // payloadLen, pSecret, step all have to match
-   // id bytes must be between 0 - 999
-   // pre: received has length % 4 == 1 and has a 0xF in final position
-   // client can still imitate this pattern, but there's no way for me to find
-   // out how many bytes i actually received so this is the best i can do
+   // Returns true if the follow criteria are met by 'received' packet,
+   // false otherwise:
+   //    - packet is at least 12 bytes
+   //    - 'payloadLen' will fit in the packet with the header
+   //    - 'payloadLen', 'pSecret', and 'step' all match fields in the header
+   //    - integer in 'id' position of header are in appropriate 0 - 999 range
    public static boolean validHeader(int payloadLen, int pSecret, int step,
                                      byte[] received) {
-      if (received.length < SIZE_HEADER )
+      if (received.length < SIZE_HEADER)
          return false;
       
       // validate length

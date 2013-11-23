@@ -82,7 +82,7 @@ public class ServerThread implements Runnable {
          record.print();
 
       } catch (Exception e) {
-	 System.out.println("   protocol error with student id: " + record.id);
+         System.out.println("   protocol error with student id: " + record.id);
       }
       System.out.println("Closing the thread with student id: " + record.id);
    }
@@ -169,7 +169,7 @@ public class ServerThread implements Runnable {
       while (!valid) {
          try {
             tcpServer = new ServerSocket(record.tcpPort = rand.nextInt(MAX_PORT - 2000) + 2000);
-	    tcpServer.setSoTimeout(3000);
+            tcpServer.setSoTimeout(3000);
             valid = true;
          } catch (Exception e) {
             // keep trying as long as the randomly chosen port is not available
