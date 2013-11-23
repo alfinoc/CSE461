@@ -58,7 +58,7 @@ public class ServerThread implements Runnable {
       // set up socket and Random for transmission later
       rand = new Random();
       udpSocket = new DatagramSocket();
-      udpSocket.setSoTimeout(10000);
+      udpSocket.setSoTimeout(3000);
 
       // create a new thread and start it up
       thread = new Thread(this, "student id: " + record.id);
@@ -81,8 +81,8 @@ public class ServerThread implements Runnable {
 
          record.print();
 
-      } catch (IOException e) {
-         System.err.println(e.getMessage());
+      } catch (Exception e) {
+	 System.out.println("   protocol error with student id: " + record.id);
       }
       System.out.println("Closing the thread with student id: " + record.id);
    }
@@ -100,7 +100,7 @@ public class ServerThread implements Runnable {
       byte[] payload = PacketUtil.adjoinByteArrays(fields);
       
       // send response with parameters for step b
-      byte[] packet = PacketUtil.packetize(payload, (new byte[SIZE_INT]), "a1", record.id);
+      byte[] packet = PacketUtil.packetize(payload, (new byte[SIZE_INT]), "a2", record.id);
       DatagramPacket out = new DatagramPacket(packet, packet.length,
                                               clientAddress, clientPort);
       udpSocket.send(out);
@@ -169,6 +169,7 @@ public class ServerThread implements Runnable {
       while (!valid) {
          try {
             tcpServer = new ServerSocket(record.tcpPort = rand.nextInt(MAX_PORT - 2000) + 2000);
+	    tcpServer.setSoTimeout(3000);
             valid = true;
          } catch (Exception e) {
             // keep trying as long as the randomly chosen port is not available
@@ -181,7 +182,7 @@ public class ServerThread implements Runnable {
    public void stepC() throws IOException {
       tcpSocket = tcpServer.accept();
       tcpServer.close();
-      tcpSocket.setSoTimeout(1000);
+      tcpSocket.setSoTimeout(3000);
       byte[] num2 = PacketUtil.toByteArray(record.num2 = rand.nextInt(50));
       byte[] len2 = PacketUtil.toByteArray(record.len2 = rand.nextInt(50));
       byte[] secretC = PacketUtil.toByteArray(record.secretC = rand.nextInt());
@@ -202,7 +203,7 @@ public class ServerThread implements Runnable {
       byte[] bufIn = new byte[SIZE_HEADER + paddedLength];
       for (int i = 0; i < record.num2; i++) {
          if (!PacketUtil.read(tcpSocket, bufIn))
-            throw new IllegalArgumentException("failed on i = " + i);
+	    throw new IllegalArgumentException("failed on i = " + i);
          if (!Validator.validHeader(record.len2, record.secretC, 1, bufIn))
             throw new IllegalArgumentException();
          for (int j = 0; j < record.len2; j++)
@@ -211,7 +212,7 @@ public class ServerThread implements Runnable {
       }
       byte[] bufOut = PacketUtil.toByteArray(record.secretD = rand.nextInt());
       byte[] packet = PacketUtil.packetize(bufOut, PacketUtil.toByteArray(record.secretC),
-                                           "d1", record.id);
+                                           "d2", record.id);
       tcpSocket.getOutputStream().write(packet);
    }
 

@@ -109,9 +109,9 @@ public class PacketUtil {
                 total += s;
                 baos.write(buf, 0, s);
             }
-            System.out.println(total);
             return total == buf.length;
         } catch (Exception e) {
+	    System.out.println("read error: " + e.getMessage());
             return false;
         }
     }
