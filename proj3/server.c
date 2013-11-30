@@ -96,5 +96,12 @@ int recieve_udp(char* buf, int buf_len, sockaddr_t sock_addr, int sockfd, int ti
 
 void* serve_client(void* arg) {
   struct client_info* client = (struct client_info*) arg;
-  printf("made it!");
+
+  // set up connections to each of the provided mac addresses
+
+
+  // acknowledge receipt with list of ports for open TCP connections
+  
+
+  // handle connection
 }
