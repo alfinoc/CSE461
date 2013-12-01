@@ -9,11 +9,10 @@
 #include <sys/types.h>
 #include <string.h>
 
-#define MAX_MAC_ADDRS 2
-#define SIZE_MAC_ADDR 6
+#define MAX_CONN 2
 
 struct client_info {
-  unsigned char mac_addrs[MAX_MAC_ADDRS][SIZE_MAC_ADDR];
+  int num_connections;
   struct sockaddr_in client_addr;
 };
 
@@ -43,14 +42,11 @@ int main(int argc, char** argv) {
 
   struct sockaddr_in client_addr;
   int rec_size;
-  char* init_req[MAX_MAC_ADDRS][SIZE_MAC_ADDR];
   struct client_info* arg;
   pthread_t pthread;
 
   while (1) {
     printf("waiting for incoming udp packet...\n");
-    rec_size = recieve_udp((void*) init_req, MAX_MAC_ADDRS * SIZE_MAC_ADDR,
-			   (sockaddr_t) &client_addr, main_sockfd, 0);
     
     // prepare arg for new client thread
     arg = (struct client_info*) malloc(sizeof(struct client_info));
@@ -58,13 +54,17 @@ int main(int argc, char** argv) {
       fprintf(stderr, "error with malloc, errno %d\n", errno);
       exit(errno);
     }
+
+    rec_size = recieve_udp((void*) &(arg->num_connections), sizeof(int),
+                           (sockaddr_t) &client_addr, main_sockfd, 0);
     
     // validate
-    if (rec_size % 6 != 0) {
+    if (rec_size != sizeof(int) || arg->num_connections > MAX_CONN
+       || arg->num_connections < 0) {
+      perror("malformed initialization packet\n");
       continue;
     }
 
-    memcpy((void*) arg->mac_addrs, (void*) init_req, MAX_MAC_ADDRS * SIZE_MAC_ADDR);
     arg->client_addr = client_addr;
 
     pthread_create(&pthread, NULL, serve_client, (void*) arg);
@@ -104,4 +104,5 @@ void* serve_client(void* arg) {
   
 
   // handle connection
+  return NULL;
 }
