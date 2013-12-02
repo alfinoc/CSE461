@@ -9,18 +9,19 @@
 #include <sys/types.h>
 #include <string.h>
 
-#define MAX_CONN 2
+#define MAX_CONN 5
 
 struct client_info {
-  int num_connections;
-  struct sockaddr_in client_addr;
+  int num_conn;
+  struct sockaddr_in sock_addr;
+  int sock_fd;
 };
 
 typedef struct sockaddr_in* sockaddr_t;
 
-int validate_init_req(struct client_info* packet, int len);
-int send_tcp(char* mesg, int len, int sockfd);
+int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd);
 int recieve_udp(char* buf, int buf_len, sockaddr_t sock_addr, int sockfd, int timeout);
+int bind_random_port(struct sockaddr_in*, int type);
 void* serve_client(void* arg);
 
 int main(int argc, char** argv) {
@@ -28,6 +29,9 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Usage: %s PORT\n", argv[0]);
     exit(1);
   }
+
+  // seed randomness
+  srand(time(NULL));
 
   int first_port = atoi(argv[1]);
 
@@ -55,20 +59,45 @@ int main(int argc, char** argv) {
       exit(errno);
     }
 
-    rec_size = recieve_udp((void*) &(arg->num_connections), sizeof(int),
+    rec_size = recieve_udp((void*) &(arg->num_conn), sizeof(int),
                            (sockaddr_t) &client_addr, main_sockfd, 0);
-    
+    arg->num_conn = ntohl(arg->num_conn);
+
     // validate
-    if (rec_size != sizeof(int) || arg->num_connections > MAX_CONN
-       || arg->num_connections < 0) {
+    if (rec_size != sizeof(int) || arg->num_conn > MAX_CONN
+       || arg->num_conn < 0) {
       perror("malformed initialization packet\n");
       continue;
     }
 
-    arg->client_addr = client_addr;
+    arg->sock_addr = client_addr;
+    arg->sock_fd = main_sockfd;
 
     pthread_create(&pthread, NULL, serve_client, (void*) arg);
   }
+}
+
+void* serve_client(void* arg) {
+  struct client_info* init = (struct client_info*) arg;
+  int* tcp_fds = (int*) malloc(sizeof(int) * init->num_conn);
+  uint32_t ack_buf[init->num_conn];
+  printf("requested number of connections: %d\n  ports:\n", init->num_conn);
+
+  // set up tcp connections, store each in tcp_conns
+  for (int i = 0; i < init->num_conn; i++) {
+    struct sockaddr_in tcp_servaddr;
+    tcp_fds[i] = bind_random_port(&tcp_servaddr, SOCK_STREAM);
+    ack_buf[i] = htonl((uint32_t) ntohs(tcp_servaddr.sin_port));
+    printf("    %d\n", tcp_servaddr.sin_port);
+  }
+
+  // acknowledge receipt with list of ports for open TCP connections
+  send_udp((char*) ack_buf, sizeof(int) * init->num_conn, &(init->sock_addr),
+	   init->sock_fd);
+
+  // accept connections -> new threads?
+
+  return NULL;
 }
 
 int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd) {
@@ -94,15 +123,22 @@ int recieve_udp(char* buf, int buf_len, sockaddr_t sock_addr, int sockfd, int ti
   return recvfrom(sockfd, buf, buf_len, 0, (struct sockaddr*) sock_addr, &socksize);
 }
 
-void* serve_client(void* arg) {
-  struct client_info* client = (struct client_info*) arg;
+int bind_random_port(struct sockaddr_in* servaddr, int type) {
+  uint16_t port;
+  uint16_t port_range = 65524 - 256;
+  int sockfd;
+  int ret;
 
-  // set up connections to each of the provided mac addresses
+  sockfd = socket(AF_INET, type, 0);
+  bzero(servaddr, sizeof(struct sockaddr_in));
+  servaddr->sin_family = AF_INET;
+  servaddr->sin_addr.s_addr=htons(INADDR_ANY);
 
+  do {
+    port = (rand() % port_range) + 256;
+    servaddr->sin_port = htons(port);
+    ret = bind(sockfd, (struct sockaddr *) servaddr, sizeof(struct sockaddr_in));
+  } while (ret == -1);
 
-  // acknowledge receipt with list of ports for open TCP connections
-  
-
-  // handle connection
-  return NULL;
+  return sockfd;
 }
