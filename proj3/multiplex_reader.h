@@ -1,6 +1,8 @@
 #ifndef MULTIPLEX_HANDLER_HEADER
 #define MUTLIPLEX_HANDLER_HEADER
 
+#include "HashTable.h"
+
 #define BLOCK_SIZE 1024
 
 struct handler_init {
@@ -13,6 +15,6 @@ struct handler_init {
 /*
  * arg should be a (handler_init struct*)
  */
-void *init(void* arg);
+void *multiplex_reader_init(void* arg);
 
 #endif

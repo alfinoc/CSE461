@@ -8,19 +8,19 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <string.h>
+#include "utils.h"
+#include "multiplex_reader.h"
 
 #define MAX_CONN 5
 
 struct client_info {
   int num_conn;
-  struct sockaddr_in sock_addr;
   int sock_fd;
+  int sock_port;
 };
 
 typedef struct sockaddr_in* sockaddr_t;
 
-int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd);
-int recieve_udp(char* buf, int buf_len, sockaddr_t sock_addr, int sockfd, int timeout);
 int bind_random_port(struct sockaddr_in*, int type);
 void* serve_client(void* arg);
 
@@ -48,6 +48,8 @@ int main(int argc, char** argv) {
   int rec_size;
   struct client_info* arg;
   pthread_t pthread;
+  struct sockaddr_in tcp_servaddr;
+    
 
   while (1) {
     printf("waiting for incoming udp packet...\n");
@@ -61,7 +63,15 @@ int main(int argc, char** argv) {
 
     rec_size = recieve_udp((void*) &(arg->num_conn), sizeof(int),
                            (sockaddr_t) &client_addr, main_sockfd, 0);
+    printf("RECEIVED UDP %d: %c%c..\n", rec_size, *(char*)&(arg->num_conn), *((char*)&(arg->num_conn) + 1));
     arg->num_conn = ntohl(arg->num_conn);
+
+    if (rec_size == 0)
+      continue;
+    
+    // debug stuff, makes netcat easier
+    // rec_size = 4;
+    // arg->num_conn = 2;
 
     // validate
     if (rec_size != sizeof(int) || arg->num_conn > MAX_CONN
@@ -70,8 +80,13 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    arg->sock_addr = client_addr;
-    arg->sock_fd = main_sockfd;
+    arg->sock_fd = bind_random_port(&tcp_servaddr, SOCK_STREAM);
+    arg->sock_port = ntohs(tcp_servaddr.sin_port);
+    
+    fprintf(stderr, "handling on port %d\n", arg->sock_port);
+
+    send_udp((char *)&tcp_servaddr.sin_port, 2,
+	     &client_addr, main_sockfd);
 
     pthread_create(&pthread, NULL, serve_client, (void*) arg);
   }
@@ -79,51 +94,35 @@ int main(int argc, char** argv) {
 
 void* serve_client(void* arg) {
   struct client_info* init = (struct client_info*) arg;
-  int* tcp_fds = (int*) malloc(sizeof(int) * init->num_conn);
-  uint32_t ack_buf[init->num_conn];
-  printf("requested number of connections: %d\n  ports:\n", init->num_conn);
+  //int* tcp_fds = (int*) malloc(sizeof(int) * init->num_conn);
+  printf("requested number of connections: %d\n", init->num_conn);
+
+  HashTable ht = AllocateHashTable(256);
+  int client_fd;
+  struct handler_init* h_init;
+  pthread_t thread;
+  struct sockaddr_in tcp_clientaddr;
+  socklen_t clientaddr_len = sizeof(tcp_clientaddr);
+
+  listen(init->sock_fd, init->sock_port);
 
   // set up tcp connections, store each in tcp_conns
   for (int i = 0; i < init->num_conn; i++) {
-    struct sockaddr_in tcp_servaddr;
-    tcp_fds[i] = bind_random_port(&tcp_servaddr, SOCK_STREAM);
-    ack_buf[i] = htonl((uint32_t) ntohs(tcp_servaddr.sin_port));
-    printf("    %d\n", tcp_servaddr.sin_port);
+    client_fd = accept(init->sock_fd, (struct sockaddr*) &tcp_clientaddr, &clientaddr_len);
+    printf("Accepted tcp: %d\n", client_fd);
+    
+    h_init = (struct handler_init*) malloc(sizeof(struct handler_init));
+    h_init->client_fd = client_fd;
+    h_init->ht = ht;
+    pthread_create(&thread, NULL, multiplex_reader_init, (void *) h_init);
   }
-
-  // acknowledge receipt with list of ports for open TCP connections
-  send_udp((char*) ack_buf, sizeof(int) * init->num_conn, &(init->sock_addr),
-	   init->sock_fd);
 
   // accept connections -> new threads?
 
   return NULL;
 }
 
-int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd) {
-  int ret = sendto(sockfd, (void*)mesg, (size_t)len, 0,
-                   (struct sockaddr *) sock_addr, sizeof(*sock_addr));
-  if (ret == -1) {
-    fprintf(stderr, "send returned error: %s\n", strerror(errno));
-  }
-  return ret;
-}
-
-int recieve_udp(char* buf, int buf_len, sockaddr_t sock_addr, int sockfd, int timeout) {
-  if (timeout != 0) {
-    struct timeval tv;
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
-      perror("Error");
-    }
-  }
-
-  socklen_t socksize = sizeof(*sock_addr);
-  return recvfrom(sockfd, buf, buf_len, 0, (struct sockaddr*) sock_addr, &socksize);
-}
-
-int bind_random_port(struct sockaddr_in* servaddr, int type) {
+int bind_random_port(sockaddr_t servaddr, int type) {
   uint16_t port;
   uint16_t port_range = 65524 - 256;
   int sockfd;

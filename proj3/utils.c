@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <string.h>
 
 int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd) {
   int ret = sendto(sockfd, (void*)mesg, (size_t)len, 0,
