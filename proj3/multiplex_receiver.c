@@ -10,9 +10,8 @@ void *init(void *arg) {
 }
 
 void listen(handler_init* params) {
-  
-
-  while (true) {
-    recieve_tcp(
+  void *block = malloc(BLOCK_SIZE);
+  while(true) {
+    
   }
 }

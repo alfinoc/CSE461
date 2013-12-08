@@ -1,6 +1,7 @@
 #ifndef MULTIPLEX_HANDLER_HEADER
 #define MUTLIPLEX_HANDLER_HEADER
 
+#define BLOCK_SIZE 1024
 
 struct handler_init {
   // The file descriptor for a TCP connection to the client
