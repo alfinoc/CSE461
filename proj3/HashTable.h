@@ -23,6 +23,7 @@
 
 #include <stdbool.h>    // for bool, true, false
 #include <stdint.h>     // so we can use uint64_t, etc.
+#include <semaphore.h>
 
 // A HashTable is a simple chained hash table with a static number of buckets.
 // We provide the interface; your job is to provide the implementation.

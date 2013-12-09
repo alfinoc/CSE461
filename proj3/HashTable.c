@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
-
+#include <semaphore.h>
 #include "HashTable.h"
 #include "HashTable_priv.h"
 
@@ -51,6 +51,11 @@ HashTable AllocateHashTable(uint32_t num_buckets) {
   if (ht == NULL) {
     return NULL;
   }
+
+  //initialize synchronization
+  sem_init(&ht->wrt, 0, 1);
+  sem_init(&ht->mutex, 0, 1);
+  ht->readcount = 0;
 
   // initialize the record
   ht->num_buckets = num_buckets;
@@ -195,6 +200,10 @@ int InsertHashTable(HashTable table,
   uint32_t insertBucket;
   LinkedList insertChain;
 
+  int ret = 0;
+  //Lock for writing!
+  sem_wait(&table->wrt);
+
   ResizeHashtable(table);
 
   // calculate which bucket we're inserting into,
@@ -206,7 +215,8 @@ int InsertHashTable(HashTable table,
   int success = find(insertChain, newkeyvalue.key, false, NULL, &found);
   if (success == -1) {
     // out of memory
-    return 0;
+    ret = 0;
+    goto cleanup;
   }
 
   if (success == 0) {
@@ -215,37 +225,65 @@ int InsertHashTable(HashTable table,
     HTKeyValuePtr newEntry = (HTKeyValuePtr) malloc(sizeof(HTKeyValue));
     if (newEntry == NULL) {
       // out of memory
-      return 0;
+      ret = 0;
+      goto cleanup;
     }
 
     *newEntry = newkeyvalue;
-    return PushLinkedList(insertChain, newEntry);
+    ret = PushLinkedList(insertChain, newEntry);
+    goto cleanup;
   } else {
     // replace value for keyvalue already in HT
     *oldkeyvalue = *found;
     found->value = newkeyvalue.value;
-    return 2;
+    ret = 2;
+    goto cleanup;
   }
+
+ cleanup:
+  sem_post(&table->wrt);
+  return ret;
 }
 
 int LookupHashTable(HashTable table,
                     uint64_t key,
                     HTKeyValue *keyvalue) {
+  int ret;
+
+  sem_wait(&table->mutex);
+  table->readcount++;
+  if (table->readcount == 1)
+    sem_wait(&table->wrt);
+  sem_post(&table->mutex);
+
   uint64_t lookupBucket = HashKeyToBucketNum(table, key);
   LinkedList lookupChain = table->buckets[lookupBucket];
 
-  return find(lookupChain, key, false, keyvalue, NULL);
+  ret = find(lookupChain, key, false, keyvalue, NULL);
+
+  sem_wait(&table->mutex);
+  table->readcount--;
+  if (table->readcount == 0)
+    sem_post(&table->wrt);
+  sem_post(&table->mutex);
+
+  return ret;
 }
 
 int RemoveFromHashTable(HashTable table,
                         uint64_t key,
                         HTKeyValue *keyvalue) {
+  sem_wait(&table->wrt);
+
   uint64_t removeBucket = HashKeyToBucketNum(table, key);
   LinkedList removeChain = table->buckets[removeBucket];
 
   int success = find(removeChain, key, true, keyvalue, NULL);
   if (success == 1)
     table->num_elements--;
+
+  sem_post(&table->wrt);
+
   return success;
 }
 

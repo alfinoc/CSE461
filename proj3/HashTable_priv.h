@@ -33,7 +33,10 @@
 typedef struct htrec {
   uint64_t        num_buckets;   // # of buckets in this HT?
   uint64_t        num_elements;  // # of elements currently in this HT?
-  LinkedList     *buckets;       // the array of buckets
+  LinkedList     *buckets;       // the array of buckets                         
+  sem_t wrt;
+  sem_t mutex;
+  uint32_t readcount;
 } HashTableRecord;
 
 // This is the struct we use to represent an iterator.
