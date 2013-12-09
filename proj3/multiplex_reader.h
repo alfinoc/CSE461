@@ -1,15 +1,21 @@
-#ifndef MULTIPLEX_HANDLER_HEADER
-#define MUTLIPLEX_HANDLER_HEADER
+#ifndef MULTIPLEX_READER_HEADER
+#define MUTLIPLEX_READER_HEADER
 
 #include "HashTable.h"
+#include <sys/types.h>
 
-#define BLOCK_SIZE 1024
+typedef void (*buffer_handler)(char* buffer, uint32_t buffer_len, void* arg);
 
-struct handler_init {
+struct mt_reader_init {
   // The file descriptor for a TCP connection to the client
   int client_fd;
   // The shared hash table for storing buffers
   HashTable ht;
+  // Function to pass completed buffers to
+  // Buffers will only be passed in order
+  buffer_handler handler;
+  // Extra argument for the handler function
+  void* listener_arg;
 };
 
 /*

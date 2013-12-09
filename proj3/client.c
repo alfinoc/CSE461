@@ -10,10 +10,8 @@
 #include <stdbool.h>
 
 #include "utils.h"
-
-#define BLOCK_SIZE 20
-
-typedef struct sockaddr_in* sockaddr_t;
+#include "multiplex_standards.h"
+#include "multiplex_writer.h"
 
 struct queue {
   struct queue_node* head;
