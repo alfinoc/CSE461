@@ -22,30 +22,30 @@ struct buffer_info {
   pthread_mutex_t mutex;
 };
 
-void listen_for_block(struct handler_init* params);
-void handle_block(HashTable ht, char* block);
-void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv);
-void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv);
-void send_buffer(void* buffer, uint32_t buffer_size);
+void listen_for_block(struct mp_reader_init* params);
+void handle_block(HashTable ht, char* block, struct mp_reader_init* arg);
+void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg);
+void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg);
+void send_buffer(void* buffer, uint32_t buffer_size, struct mp_reader_init* arg);
 
 void *multiplex_reader_init(void *arg) {
-  struct handler_init* params = (struct handler_init*) arg;
+  struct mp_reader_init* params = (struct mp_reader_init*) arg;
   
   listen_for_block(params);
   return NULL;
 }
 
-void listen_for_block(struct handler_init* params) {
+void listen_for_block(struct mp_reader_init* arg) {
   char *block = malloc(BLOCK_SIZE);
   
-  fprintf(stderr, "waiting for block on tcp %d\n", params->client_fd);
+  fprintf(stderr, "waiting for block on tcp %d\n", arg->client_fd);
   while(true) {
-    recieve_tcp(block, BLOCK_SIZE, params->client_fd, 0);
-    handle_block(params->ht, block);
+    recieve_tcp(block, BLOCK_SIZE, arg->client_fd, 0);
+    handle_block(arg->ht, block, arg);
   }
 }
 
-void handle_block(HashTable ht, char* block) {
+void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
   int* head = (int*) block;
   if (*head == -1) {
     // initialize a new buffer
@@ -117,12 +117,12 @@ void handle_block(HashTable ht, char* block) {
     
     if(n_written * BLOCK_SIZE >= buffer->buffer_size) {
       buffer->completed = true;
-      handle_finished_buffer_prev(ht, buffer_kv);
+      handle_finished_buffer_prev(ht, buffer_kv, arg);
     }
   }
 }
 
-void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv) {
+void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg) {
   struct buffer_info* done = (struct buffer_info*) buffer_kv.value;
   fprintf(stderr, "there's a completed buffer of size %u. life is good\n", done->buffer_size);
 
@@ -156,20 +156,20 @@ void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv) {
   }
 
   // either we have no dependancies or they've been sent
-  handle_finished_buffer_next(ht, buffer_kv);
+  handle_finished_buffer_next(ht, buffer_kv, arg);
 }
 
-void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv) {
+void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg) {
   struct buffer_info* buffer = (struct buffer_info*) buffer_kv.value;
   
-  send_buffer(buffer->buffer, buffer->buffer_size);
+  arg->handler(buffer->buffer, buffer->buffer_size, arg->handler_arg);
 
   // TODO: sycn
   HTKeyValue next_buf_kv;
   if(!buffer->last_block && LookupHashTable(ht, buffer->next_tag, &next_buf_kv) == 1) {
     struct buffer_info* next_buf = (struct buffer_info*) next_buf_kv.value;
     if (next_buf->completed) {
-      handle_finished_buffer_next(ht, next_buf_kv); // recursively send buffers that depend on us
+      handle_finished_buffer_next(ht, next_buf_kv, arg); // recursively send buffers that depend on us
       goto done;
     } else
       goto zombie; // we have to wait for them to be done
@@ -186,9 +186,4 @@ void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv) {
  zombie:
   // we can't free since someone still might care that the packet was read
   buffer->sent = true;
-}
-
-void send_buffer(void* buffer, uint32_t buffer_size) {
-  printf("WE'RE SENDING A BUFFER OF SIZE %u! WOOOOOO\n", buffer_size);
-  free(buffer);
 }

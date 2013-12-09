@@ -6,7 +6,7 @@
 
 typedef void (*buffer_handler)(char* buffer, uint32_t buffer_len, void* arg);
 
-struct mt_reader_init {
+struct mp_reader_init {
   // The file descriptor for a TCP connection to the client
   int client_fd;
   // The shared hash table for storing buffers
@@ -15,7 +15,7 @@ struct mt_reader_init {
   // Buffers will only be passed in order
   buffer_handler handler;
   // Extra argument for the handler function
-  void* listener_arg;
+  void* handler_arg;
 };
 
 /*

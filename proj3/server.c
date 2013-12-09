@@ -23,6 +23,7 @@ typedef struct sockaddr_in* sockaddr_t;
 
 int bind_random_port(struct sockaddr_in*, int type);
 void* serve_client(void* arg);
+void send_buffer(char* buffer, uint32_t buffer_len, void* arg);
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -99,7 +100,7 @@ void* serve_client(void* arg) {
 
   HashTable ht = AllocateHashTable(256);
   int client_fd;
-  struct handler_init* h_init;
+  struct mp_reader_init* h_init;
   pthread_t thread;
   struct sockaddr_in tcp_clientaddr;
   socklen_t clientaddr_len = sizeof(tcp_clientaddr);
@@ -111,15 +112,22 @@ void* serve_client(void* arg) {
     client_fd = accept(init->sock_fd, (struct sockaddr*) &tcp_clientaddr, &clientaddr_len);
     printf("Accepted tcp: %d\n", client_fd);
     
-    h_init = (struct handler_init*) malloc(sizeof(struct handler_init));
+    h_init = (struct mp_reader_init*) malloc(sizeof(struct mp_reader_init));
     h_init->client_fd = client_fd;
     h_init->ht = ht;
+    h_init->handler = send_buffer;
+    h_init->handler_arg = NULL;
     pthread_create(&thread, NULL, multiplex_reader_init, (void *) h_init);
   }
 
   // accept connections -> new threads?
 
   return NULL;
+}
+
+void send_buffer(char* buffer, uint32_t buffer_len, void* arg) {
+  fprintf(stderr, "CALLED BACK FOR A BUFFER! BUFFER LEN %u\n", buffer_len);
+  free(buffer);
 }
 
 int bind_random_port(sockaddr_t servaddr, int type) {
