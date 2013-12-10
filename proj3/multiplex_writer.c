@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -8,13 +9,21 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #include "utils.h"
 #include "queue.h"
 #include "multiplex_standards.h"
 #include "multiplex_writer.h"
 
-void multi_send(struct queue* q, char* host, int port);
+struct send_arg {
+  struct queue* queue;
+  char* host;
+  int port;
+};
+
+void multi_send(char* buf, int len, char* host, int port, int num_conn);
+void* queue_send(void*);
 void build_queue(char* buf, int len, struct queue* q);
 
 int main(int argc, char** argv) {
@@ -24,35 +33,56 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
-  char* host = argv[1];
-  uint32_t port = atoi(argv[2]);
-  //int num_conn = atoi(argv[3]);
-
-
   char* example_buffer = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
   int buf_len = 447;
     
-  struct queue* blocks = allocate_queue();
-  build_queue(example_buffer, buf_len, blocks);
-
-  multi_send(blocks, host, port);
-  free_queue(blocks);
+  multi_send(example_buffer, buf_len, argv[1], atoi(argv[2]), atoi(argv[3]));
 }
 
-// opens a tcp connection to host on port, and sends from 'q' until
+// spins up 'num_conn' threads, which will send the 'len' length contents
+// of 'buf' to destination 'host':'port' on 'num_conn' TCP connections
+void multi_send(char* buf, int len, char* host, int port, int num_conn) {
+  // prepare common argument for all threads
+  struct send_arg args;
+  args.host = host;
+  args.port = port;
+
+  // prepare and build queue from buffer
+  struct queue* blocks = allocate_queue();
+  args.queue = blocks;
+  build_queue(buf, len, blocks);
+
+  // spin up all 'num_conn' threads
+  pthread_t pthread;
+  for (int i = 0; i < num_conn; i++)
+    pthread_create(&pthread, NULL, queue_send, (void*) &args);
+  
+  while (true) ;
+}
+
+// opens a TCP connection to host on port, and sends from 'q' until
 // 'q' is empty, returning when this is the case
-void multi_send(struct queue* q, char* host, int port) {
+void* queue_send(void* args) {
+  // extract fields associated with host address and shared queue
+  struct send_arg* extr = (struct send_arg*) args;
+  struct queue* q = extr->queue;
+  char* host = extr->host;
+  int port = extr->port;
+
+  // set up file descriptor
   struct sockaddr_in sa;
   sockaddr_t servaddr = &sa;
   int sockfd;
-
   open_tcp(host, port, servaddr, &sockfd);
 
+  // write until the queue is empty
   while (!is_empty(q)) {
     char* block;
     int block_size = dequeue(q, &block);
     send_tcp(block, block_size, sockfd);
   }
+  close(sockfd);
+  return NULL;
 }
 
 // fills the queue pointed to by 'q' with pointers to segments of
