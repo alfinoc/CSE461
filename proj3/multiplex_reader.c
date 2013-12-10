@@ -42,7 +42,6 @@ void listen_for_block(struct mp_reader_init* arg) {
   
   fprintf(stderr, "waiting for block on tcp %d, size %d\n", arg->client_fd, max_size);
   int ret;
-  int read_size;
   while(true) {
     ret = recieve_tcp_block(block, max_size, arg->client_fd, 0);
     fprintf(stderr, "got block with ret %d\n", ret);

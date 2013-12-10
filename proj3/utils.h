@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <stdint.h>
 
 typedef struct sockaddr_in* sockaddr_t;
 

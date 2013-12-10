@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd) {
   int ret = sendto(sockfd, (void*)mesg, (size_t)len, 0,
@@ -54,7 +55,6 @@ int send_tcp(char* mesg, int len, int sockfd) {
   return ret;
 }
 
-
 void open_udp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd) {
   *sockfd = socket(AF_INET,SOCK_DGRAM,0);
 
@@ -63,7 +63,6 @@ void open_udp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd) {
   servaddr->sin_addr.s_addr = inet_addr(addr);
   servaddr->sin_port=htons(port);
 }
-
 
 int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd, char* nic_addr) {
   *sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
