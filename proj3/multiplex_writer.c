@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
   build_queue(example_buffer, buf_len, blocks);
 
   multi_send(blocks, host, port);
+  free_queue(blocks);
 }
 
 // opens a tcp connection to host on port, and sends from 'q' until

@@ -15,4 +15,4 @@ test_client:
 all: server test_client
 
 clean:
-	rm *~ server *.o
+	rm *~ server client *.o

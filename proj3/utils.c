@@ -63,7 +63,7 @@ int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd) {
   servaddr->sin_addr.s_addr = inet_addr(addr);
   servaddr->sin_port=htons(port);
 
-  fprintf(stderr, "attemping to connect on port %x...", port);
+  fprintf(stderr, "attempting to connect on port %x...", port);
 
   int ret = -1;
   do {
