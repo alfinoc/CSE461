@@ -72,7 +72,7 @@ int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd, char* 
   servaddr->sin_addr.s_addr = inet_addr(addr);
   servaddr->sin_port=htons(port);
 
-  fprintf(stderr, "attemping to connect on port %x...", port);
+  fprintf(stderr, "attempting to connect on port %x...", port);
 
   if (nic_addr != NULL) {
     struct sockaddr_in client_addr;

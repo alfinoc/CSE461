@@ -1,9 +1,15 @@
 #ifndef QUEUE_HEADER
 #define QUEUE_HEADER
 
+#include <semaphore.h>
+
 struct queue {
   struct queue_node* head;
   struct queue_node* tail;
+  pthread_mutex_t mutex;
+  pthread_cond_t cv;
+  
+  sem_t wrt;
 };
 
 struct queue_node {

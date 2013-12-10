@@ -12,6 +12,7 @@
 #include "multiplex_reader.h"
 #include "multiplex_writer.h"
 #include "multiplex_standards.h"
+#include "queue.h"
 
 #define MAX_CONN 5
 
@@ -32,9 +33,12 @@ int main(int argc, char** argv) {
   fprintf(stderr, "handshake successful, using tcp port %u\n", tcp_port);
 
   struct sockaddr_in servaddr;
-  int fd[num_conn];
   struct mp_writer_init* writer_init;
-  pthread_t thread;
+ 
+  pthread_t threads[num_conn];
+  int fd[num_conn];
+  struct queue* queues[num_conn];
+
   for (int i = 3; i < argc; i++) {
     if (open_tcp(serv_address, tcp_port, &servaddr, &fd[i-3], argv[i]) == -1) {
       fprintf(stderr, "opening tcp failed on NIC address %s\n", argv[i]);
@@ -44,13 +48,21 @@ int main(int argc, char** argv) {
     //init writers and readers with fd
     writer_init = (struct mp_writer_init*) malloc(sizeof(struct mp_writer_init));
     writer_init->client_fd = fd[i-3];
-    writer_init->queue = NULL; // TODO figure this out
+    queues[i] = allocate_queue();
+    writer_init->queue = queues[i];
 
-    pthread_create(&thread, NULL, multiplex_writer_init, (void *)writer_init);
-    void* ptr;
-    pthread_join(thread, &ptr);
+    pthread_create(&threads[i], NULL, multiplex_writer_init, (void *)writer_init);
   }
+
+  char* example_buffer = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
+
+  multiplex_write_queues(queues, example_buffer, strlen(example_buffer));
+
+  //wait to exit so things can send
+  sleep(5);
 }
+
+
 
 uint32_t udp_handshake(char* serv_address, uint32_t udp_port, int num_conn) {
   int udp_fd;
