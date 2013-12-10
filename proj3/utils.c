@@ -40,7 +40,7 @@ int recieve_tcp(char* buf, int buf_len, int sockfd, int timeout) {
     }
   }
 
-  int n = recv(sockfd, buf, buf_len, 0);
+  int n = read(sockfd, buf, buf_len);
 
   return n;
 }
@@ -51,5 +51,52 @@ int send_tcp(char* mesg, int len, int sockfd) {
   if (ret == -1) {
     fprintf(stderr, "send returned error: %s\n", strerror(errno));
   }
+  return ret;
+}
+
+
+void open_udp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd) {
+  *sockfd = socket(AF_INET,SOCK_DGRAM,0);
+
+  bzero(servaddr,sizeof(struct sockaddr_in));
+  servaddr->sin_family = AF_INET;
+  servaddr->sin_addr.s_addr = inet_addr(addr);
+  servaddr->sin_port=htons(port);
+}
+
+
+int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd, char* nic_addr) {
+  *sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+  bzero(servaddr,sizeof(struct sockaddr_in));
+  servaddr->sin_family = AF_INET;
+  servaddr->sin_addr.s_addr = inet_addr(addr);
+  servaddr->sin_port=htons(port);
+
+  fprintf(stderr, "attemping to connect on port %x...", port);
+
+  if (nic_addr != NULL) {
+    struct sockaddr_in client_addr;
+    memset(&client_addr, '0', sizeof(client_addr));
+    
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = htons(5000); //shouldn't matter i don't think
+    if(inet_pton(AF_INET, nic_addr, &client_addr.sin_addr)<=0) {
+      printf("\n inet_pton error occured on client bind\n");
+      return -1;
+    }
+
+    bind(*sockfd, (struct sockaddr*)&client_addr, sizeof(client_addr));
+  }
+
+  int ret = -1;
+  do {
+    ret = connect(*sockfd, (struct sockaddr *) servaddr, sizeof(struct sockaddr_in));
+
+    if (ret == -1)
+      fprintf(stderr, "error: %s... ", strerror(errno));
+  } while (ret == -1);
+  fprintf(stderr, "connected.\n");
+
   return ret;
 }

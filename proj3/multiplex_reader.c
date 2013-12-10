@@ -27,6 +27,7 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg);
 void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg);
 void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg);
 void send_buffer(void* buffer, uint32_t buffer_size, struct mp_reader_init* arg);
+int recieve_tcp_block(char* buf, int buf_len, int sockfd, int timeout);
 
 void *multiplex_reader_init(void *arg) {
   struct mp_reader_init* params = (struct mp_reader_init*) arg;
@@ -36,13 +37,58 @@ void *multiplex_reader_init(void *arg) {
 }
 
 void listen_for_block(struct mp_reader_init* arg) {
-  char *block = malloc(BLOCK_SIZE);
+  int max_size = BLOCK_SIZE + sizeof(struct data_block);
+  char *block = malloc(max_size);
   
-  fprintf(stderr, "waiting for block on tcp %d\n", arg->client_fd);
+  fprintf(stderr, "waiting for block on tcp %d, size %d\n", arg->client_fd, max_size);
+  int ret;
+  int read_size;
   while(true) {
-    recieve_tcp(block, BLOCK_SIZE, arg->client_fd, 0);
+    ret = recieve_tcp_block(block, max_size, arg->client_fd, 0);
+    fprintf(stderr, "got block with ret %d\n", ret);
+    // 0 is EOF, the client probably closed the connection
+    if (ret == 0) {
+      fprintf(stderr, "closing fd %d\n", arg->client_fd);
+      close(arg->client_fd);
+      return;
+    }
     handle_block(arg->ht, block, arg);
+ }
+}
+
+// reads in a block at time, using the chunk_size field to know when to stop reading.
+int recieve_tcp_block(char* buf, int buf_len, int sockfd, int timeout) {
+  if (timeout != 0) {
+    struct timeval tv;
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+      perror("Error");
+    }
   }
+
+  int ret;
+  int index = 0 ;
+  uint32_t block_size;
+  // read in at least the first 4 bytes to learn the chunk size
+  while (index < sizeof(block_size)) {
+    ret = read(sockfd, &buf[index], sizeof(block_size) - index);
+    if (ret < 1)
+      return ret;
+    index += ret;
+  }
+  block_size = *(uint32_t*)buf;
+  if (block_size > buf_len) {
+    fprintf(stderr, "buffer not long enough to receive a block!\n");
+  }
+  // read in the rest of the chunk
+  while (index < block_size) {
+    ret = read(sockfd, &buf[index], block_size - index);
+    if (ret < 1)
+      return ret;
+    index += ret;  
+  }
+  return index;
 }
 
 void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
@@ -96,6 +142,7 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
     HTKeyValue buffer_kv;
 
     while(LookupHashTable(ht, buffer_data->tag, &buffer_kv) != 1) {
+      sleep(1);
       fprintf(stderr, "buffer not found in the hash table! spinning..\n");
     }
     

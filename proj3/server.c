@@ -1,3 +1,4 @@
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,8 +65,9 @@ int main(int argc, char** argv) {
 
     rec_size = recieve_udp((void*) &(arg->num_conn), sizeof(int),
                            (sockaddr_t) &client_addr, main_sockfd, 0);
-    printf("RECEIVED UDP %d: %c%c..\n", rec_size, *(char*)&(arg->num_conn), *((char*)&(arg->num_conn) + 1));
     arg->num_conn = ntohl(arg->num_conn);
+
+    printf("RECEIVED UDP %d: %c%c..\n", rec_size, *(char*)&(arg->num_conn), *((char*)&(arg->num_conn) + 1));
 
     if (rec_size == 0)
       continue;

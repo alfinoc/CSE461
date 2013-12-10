@@ -1,15 +1,18 @@
 CC=gcc
 CFLAGS= -g -Wall -std=gnu99 -pthread
-DEPS = utils.h HashTable.h multiplex_standards.h multiplex_reader.h LinkedList.h
-OBJ = utils.o HashTable.o multiplex_reader.o server.o LinkedList.o
+DEPS = utils.h HashTable.h multiplex_standards.h multiplex_reader.h LinkedList.h multiplex_writer.h
+OBJ = utils.o HashTable.o multiplex_reader.o LinkedList.o multiplex_writer.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-server: $(OBJ)
+all: server client
+
+server: $(OBJ) server.o
 	gcc -o $@ $^ $(CFLAGS)
 
-all: server
+client: $(OBJ) client.o
+	gcc -o $@ $^ $(CFLAGS)
 
 clean:
 	rm *~ server *.o

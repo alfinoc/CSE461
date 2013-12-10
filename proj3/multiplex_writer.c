@@ -33,7 +33,14 @@ void enqueue(struct queue* queue, char* buf, int buf_len);
 int is_empty(struct queue* queue);
 void print_queue(struct queue* queue);
 
-int main(int argc, char** argv) {
+void *multiplex_writer_init(void* arg) {
+  struct mp_writer_init* init_params = (struct mp_writer_init*) arg;
+  fprintf(stderr, "multiplex_writer_init called on file descriptor %d\n", init_params->client_fd);
+  return NULL;
+}
+
+// I had to make this "main2" to link with the application code
+int main2(int argc, char** argv) {
   /*
   if (argc != 4) {
     fprintf(stderr, "Usage: %s <host> <port> <number of connections>\n", argv[0]);
@@ -49,6 +56,8 @@ int main(int argc, char** argv) {
   int buf_len = 447;
     
   multi_send(example_buffer, buf_len, 1);
+
+  return 0;
 }
 
 int multi_send(char* buf, int len, int fd) {
