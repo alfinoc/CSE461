@@ -52,12 +52,12 @@ void multi_send(char* buf, int len, char* host, int port, int num_conn) {
   args.queue = blocks;
   build_queue(buf, len, blocks);
 
-  // spin up all 'num_conn' threads
-  pthread_t pthread;
+  // spin up all 'num_conn' threads and block until they each finish up
+  pthread_t pid[num_conn];
   for (int i = 0; i < num_conn; i++)
-    pthread_create(&pthread, NULL, queue_send, (void*) &args);
-  
-  while (true) ;
+    pthread_create(&pid[i], NULL, queue_send, (void*) &args);
+  for (int i = 0; i < num_conn; i++)
+    pthread_join(pid[i], NULL);
 }
 
 // opens a TCP connection to host on port, and sends from 'q' until
