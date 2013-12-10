@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#define BLOCK_SIZE 1024
+#define BLOCK_SIZE 20
 #define NO_TAG -1
 
 struct data_block {

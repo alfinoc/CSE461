@@ -9,7 +9,10 @@ OBJ = utils.o HashTable.o multiplex_reader.o server.o LinkedList.o
 server: $(OBJ)
 	gcc -o $@ $^ $(CFLAGS)
 
-all: server
+test_client:
+	gcc -g -Wall -std=gnu99 -o client -pthread utils.c multiplex_writer.c
+
+all: server test_client
 
 clean:
 	rm *~ server *.o

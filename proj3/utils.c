@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd) {
   int ret = sendto(sockfd, (void*)mesg, (size_t)len, 0,
@@ -53,3 +54,26 @@ int send_tcp(char* mesg, int len, int sockfd) {
   }
   return ret;
 }
+
+int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd) {
+  *sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+  bzero(servaddr,sizeof(struct sockaddr_in));
+  servaddr->sin_family = AF_INET;
+  servaddr->sin_addr.s_addr = inet_addr(addr);
+  servaddr->sin_port=htons(port);
+
+  fprintf(stderr, "attemping to connect on port %x...", port);
+
+  int ret = -1;
+  do {
+    ret = connect(*sockfd, (struct sockaddr *) servaddr, sizeof(struct sockaddr_in));
+
+    if (ret == -1)
+      fprintf(stderr, "error: %s... ", strerror(errno));
+  } while (ret == -1);
+  fprintf(stderr, "connected.\n");
+
+  return ret;
+}
+
