@@ -1,2 +1,5 @@
 *~
 server
+client
+#*#
+*.o
