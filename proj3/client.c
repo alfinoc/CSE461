@@ -14,9 +14,12 @@
 #include "multiplex_standards.h"
 #include "queue.h"
 
-#define MAX_CONN 5
+char* test_input = "testin.dat";
+char* test_output = "testout.dat";
 
 uint32_t udp_handshake(char* serv_address, uint32_t udp_port, int num_conn);
+
+void test_writing(struct queue** queues);
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -54,15 +57,31 @@ int main(int argc, char** argv) {
     pthread_create(&threads[i], NULL, multiplex_writer_init, (void *)writer_init);
   }
 
-  char* example_buffer = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
-
-  multiplex_write_queues(queues, example_buffer, strlen(example_buffer));
+  test_writing(queues);
 
   //wait to exit so things can send
   sleep(5);
 }
 
+void test_writing(struct queue** queues) {
+  int buffer_size = 65536;
+  char buffer[buffer_size];
 
+  FILE* file = fopen (test_input, "rt");
+
+  if (file == NULL) {
+    fprintf(stderr, "problem opening file\n");
+    return;
+  }
+  
+  int read_size;
+  while( (read_size = fread(buffer, 1, buffer_size, file)) ) {
+    fprintf(stderr, "writing buffer chunk of size %d\n", read_size);
+    multiplex_write_queues(queues, buffer, read_size);
+  }
+
+  fclose(file);  /* close the file prior to exiting the routine */
+}
 
 uint32_t udp_handshake(char* serv_address, uint32_t udp_port, int num_conn) {
   int udp_fd;

@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 struct buffer_info {
   char* buffer;
   uint32_t buffer_size;
@@ -39,7 +38,7 @@ void *multiplex_reader_init(void *arg) {
 void listen_for_block(struct mp_reader_init* arg) {
   int max_size = BLOCK_SIZE + sizeof(struct data_block);
   char *block = malloc(max_size);
-  
+
   fprintf(stderr, "waiting for block on tcp %d, size %d\n", arg->client_fd, max_size);
   int ret;
   while(true) {
@@ -85,13 +84,13 @@ int recieve_tcp_block(char* buf, int buf_len, int sockfd, int timeout) {
     ret = read(sockfd, &buf[index], block_size - index);
     if (ret < 1)
       return ret;
-    index += ret;  
+    index += ret;
   }
   return index;
 }
 
 void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
-  int* head = (int*) block;
+  int* head = ((int*) block + 1);
   if (*head == -1) {
     // initialize a new buffer
     struct init_block* init = (struct init_block*) block;
@@ -148,20 +147,17 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
     // we found the buffer object, thank god
     struct buffer_info* buffer = (struct buffer_info*) buffer_kv.value;
    
-    uint32_t copy_size = BLOCK_SIZE;
-    uint32_t start_index = buffer_data->seq_number * BLOCK_SIZE;
-    if (start_index + BLOCK_SIZE >= buffer->buffer_size) {
-      // this must be the last packet, so it might be shorter..
-      copy_size = buffer->buffer_size - start_index;
-    }
-
-    memcpy(&buffer->buffer[start_index], &block[sizeof(struct data_block)], copy_size);
+    memcpy(&buffer->buffer[buffer_data->seq_number], &block[sizeof(buffer_data)], buffer_data->block_size);
 
     pthread_mutex_lock(&buffer->mutex);
-    uint32_t n_written = ++buffer->n_written;
+    buffer->n_written += buffer_data->block_size;
+    uint32_t n_written = buffer->n_written;
     pthread_mutex_unlock(&buffer->mutex);
     
-    if(n_written * BLOCK_SIZE >= buffer->buffer_size) {
+    if(n_written > buffer->buffer_size) {
+      fprintf(stderr, "OVERFILLED BUFFER! buffer size %u n_written %u\n", buffer->buffer_size, n_written);
+    }
+    if(n_written == buffer->buffer_size) {
       buffer->completed = true;
       handle_finished_buffer_prev(ht, buffer_kv, arg);
     }

@@ -1,4 +1,3 @@
-
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +12,8 @@
 #include "multiplex_reader.h"
 
 #define MAX_CONN 5
+
+char* test_output = "testout.dat";
 
 struct client_info {
   int num_conn;
@@ -128,6 +129,15 @@ void* serve_client(void* arg) {
 }
 
 void send_buffer(char* buffer, uint32_t buffer_len, void* arg) {
+  FILE* file = fopen(test_output, "w+");
+  if (file == NULL) {
+    fprintf(stderr, "error opening output file\n");
+    free(buffer);
+    return;
+  }
+
+  fwrite(buffer, 1, buffer_len, file);
+
   fprintf(stderr, "CALLED BACK FOR A BUFFER! BUFFER LEN %u\n", buffer_len);
   free(buffer);
 }
