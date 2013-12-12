@@ -19,7 +19,7 @@ char* test_output = "testout.dat";
 
 uint32_t udp_handshake(char* serv_address, uint32_t udp_port, int num_conn);
 
-void test_writing(struct queue** queues, int n_queues);
+void test_writing(struct queue** queues, int num_queues);
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
   sleep(5);
 }
 
-void test_writing(struct queue** queues, int n_queues) {
+void test_writing(struct queue** queues, int num_queues) {
   int buffer_size = 65536;
   char buffer[buffer_size];
 
@@ -77,7 +77,7 @@ void test_writing(struct queue** queues, int n_queues) {
   int read_size;
   while( (read_size = fread(buffer, 1, buffer_size, file)) ) {
     fprintf(stderr, "writing buffer chunk of size %d\n", read_size);
-    multiplex_write_queues(queues, n_queues, buffer, read_size);
+    multiplex_write_queues(queues, num_queues, buffer, read_size);
   }
 
   fclose(file);  /* close the file prior to exiting the routine */
