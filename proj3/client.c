@@ -19,7 +19,7 @@ char* test_output = "testout.dat";
 
 uint32_t udp_handshake(char* serv_address, uint32_t udp_port, int num_conn);
 
-void test_writing(struct queue** queues);
+void test_writing(struct queue** queues, int n_queues);
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -42,28 +42,28 @@ int main(int argc, char** argv) {
   int fd[num_conn];
   struct queue* queues[num_conn];
 
-  for (int i = 3; i < argc; i++) {
-    if (open_tcp(serv_address, tcp_port, &servaddr, &fd[i-3], argv[i]) == -1) {
-      fprintf(stderr, "opening tcp failed on NIC address %s\n", argv[i]);
+  for (int i = 0; i < num_conn; i++) {
+    if (open_tcp(serv_address, tcp_port, &servaddr, &fd[i], argv[i+3]) == -1) {
+      fprintf(stderr, "opening tcp failed on NIC address %s\n", argv[i+3]);
       exit(1);
     }
     
     //init writers and readers with fd
     writer_init = (struct mp_writer_init*) malloc(sizeof(struct mp_writer_init));
-    writer_init->client_fd = fd[i-3];
+    writer_init->client_fd = fd[i];
     queues[i] = allocate_queue();
     writer_init->queue = queues[i];
 
     pthread_create(&threads[i], NULL, multiplex_writer_init, (void *)writer_init);
   }
 
-  test_writing(queues);
+  test_writing(queues, num_conn);
 
   //wait to exit so things can send
   sleep(5);
 }
 
-void test_writing(struct queue** queues) {
+void test_writing(struct queue** queues, int n_queues) {
   int buffer_size = 65536;
   char buffer[buffer_size];
 
@@ -77,7 +77,7 @@ void test_writing(struct queue** queues) {
   int read_size;
   while( (read_size = fread(buffer, 1, buffer_size, file)) ) {
     fprintf(stderr, "writing buffer chunk of size %d\n", read_size);
-    multiplex_write_queues(queues, buffer, read_size);
+    multiplex_write_queues(queues, n_queues, buffer, read_size);
   }
 
   fclose(file);  /* close the file prior to exiting the routine */

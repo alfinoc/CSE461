@@ -70,11 +70,17 @@ void write_block_to_queue(struct queue* queue, char* block, int block_size) {
 void multiplex_write_queues(struct queue** queues, int num_queues,
 			    char* buffer, int buf_len) {
   int unif_size = min(BLOCK_SIZE, buf_len / num_queues);
-    
+
   for (int i = 0; i < buf_len; i += unif_size) {
-    int actual_size = min(unif_size, buf_len - unif_size * i);
+    int actual_size = min(unif_size, buf_len - i);
     char* headered_block = (char*) malloc(sizeof(struct data_block)
 					  + actual_size);
+
+    if (headered_block == NULL) {
+      fprintf(stderr, "Could not malloc new block in multiplex_writer: errno %d\n", errno);
+      exit(1);
+    }
+
     struct data_block header;
     header.block_size = actual_size;
     header.seq_number = i;
