@@ -142,8 +142,6 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
   } else {
     struct data_block* buffer_data = (struct data_block*) block;
 
-    fprintf(stderr, "recieved data packet of size %u\n", buffer_data->block_size);
-
     uint32_t data_size = buffer_data->block_size - sizeof(struct data_block);
 
     // this must be data for an existing buffer    
@@ -162,7 +160,6 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
     
     buffer->n_written += data_size;
     uint32_t n_written = buffer->n_written;
-    fprintf(stderr, "%d/%d completed\n", n_written, buffer->buffer_size);
     pthread_mutex_unlock(&buffer->mutex);
     if(n_written == buffer->buffer_size) {
       buffer->completed = true;
@@ -173,8 +170,6 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
 
 void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg) {
   struct buffer_info* done = (struct buffer_info*) buffer_kv.value;
-
-  fprintf(stderr, "completed buffer %d with prev_tag %d\n", done->tag, done->prev_tag);
 
   if (done->prev_tag != NO_TAG) {
     // we have a dependancy
@@ -212,8 +207,6 @@ void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_r
 void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg) {
   struct buffer_info* buffer = (struct buffer_info*) buffer_kv.value;
 
-  fprintf(stderr, "got to before handler\n");
-  
   arg->handler(buffer->buffer, buffer->buffer_size, arg->handler_arg);
 
   // TODO: sycn
