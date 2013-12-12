@@ -10,6 +10,8 @@
 #include <string.h>
 #include "utils.h"
 #include "multiplex_reader.h"
+#include "queue.h"
+#include "multiplex_writer.h"
 
 #define MAX_CONN 5
 
@@ -26,6 +28,12 @@ typedef struct sockaddr_in* sockaddr_t;
 int bind_random_port(struct sockaddr_in*, int type);
 void* serve_client(void* arg);
 void send_buffer(char* buffer, uint32_t buffer_len, void* arg);
+void bounce_buffer(char* buffer, uint32_t buffer_len, void* bb_arg);
+
+struct bounce_buf_arg {
+  struct queue** queues;
+  int n_queues;
+};
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -56,7 +64,6 @@ int main(int argc, char** argv) {
   pthread_t pthread;
   struct sockaddr_in tcp_servaddr;
     
-
   while (1) {
     printf("waiting for udp handshake...\n");
     
@@ -102,11 +109,21 @@ void* serve_client(void* arg) {
   printf("requested number of connections: %d\n", init->num_conn);
 
   HashTable ht = AllocateHashTable(256);
+  struct queue** queues = (struct queue**) malloc(init->num_conn * sizeof(struct queue));
+
   int client_fd;
-  struct mp_reader_init* h_init;
+
+  struct mp_reader_init* reader_init;
+  struct mp_writer_init* writer_init;
+
   pthread_t thread;
   struct sockaddr_in tcp_clientaddr;
   socklen_t clientaddr_len = sizeof(tcp_clientaddr);
+
+  struct bounce_buf_arg* bounce_buffer_arg = (struct bounce_buf_arg*) 
+    malloc(sizeof(struct bounce_buf_arg));
+  bounce_buffer_arg->queues = queues;
+  bounce_buffer_arg->n_queues = init->num_conn;
 
   listen(init->sock_fd, init->sock_port);
 
@@ -115,15 +132,36 @@ void* serve_client(void* arg) {
     client_fd = accept(init->sock_fd, (struct sockaddr*) &tcp_clientaddr, &clientaddr_len);
     printf("Accepted tcp: %d\n", client_fd);
     
-    h_init = (struct mp_reader_init*) malloc(sizeof(struct mp_reader_init));
-    h_init->client_fd = client_fd;
-    h_init->ht = ht;
-    h_init->handler = send_buffer;
-    h_init->handler_arg = NULL;
-    pthread_create(&thread, NULL, multiplex_reader_init, (void *) h_init);
+    //init writers and readers with fd                                                                   
+    queues[i] = allocate_queue();
+    writer_init = (struct mp_writer_init*) malloc(sizeof(struct mp_writer_init));
+    writer_init->client_fd = client_fd;
+    writer_init->queue = queues[i];
+    pthread_create(&thread, NULL, multiplex_writer_init, (void *)writer_init);
+
+    reader_init = (struct mp_reader_init*) malloc(sizeof(struct mp_reader_init));
+    reader_init->client_fd = client_fd;
+    reader_init->ht = ht;
+    reader_init->handler = bounce_buffer;
+    reader_init->handler_arg = bounce_buffer_arg;
+    pthread_create(&thread, NULL, multiplex_reader_init, (void *) reader_init);
+
   }
 
   return NULL;
+}
+
+void bounce_buffer(char* buffer, uint32_t buffer_len, void* bb_arg) {
+  struct bounce_buf_arg* arg = (struct bounce_buf_arg*) bb_arg;
+  struct queue** queues = arg->queues;
+  int n_queues = arg->n_queues;
+
+  printf("BOUNCING BUFFER OF SIZE %u BACK!\n", buffer_len);
+
+  //send the buffer back!
+  multiplex_write_queues(queues, n_queues, buffer, buffer_len);
+
+  free(buffer);
 }
 
 void send_buffer(char* buffer, uint32_t buffer_len, void* arg) {

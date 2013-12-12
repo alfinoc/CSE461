@@ -35,8 +35,6 @@ void *multiplex_writer_init(void* arg) {
 
   listen_for_blocks(init_params);
 
-  fprintf(stderr, "multiplex_writer_init called on file descriptor %d\n",
-	  init_params->client_fd);
   return NULL;
 }
 
@@ -94,8 +92,6 @@ void multiplex_write_queues(struct queue** queues, int num_queues,
   for (divisor = 1.0; buf_len / (divisor * num_queues) > BLOCK_SIZE; divisor ++);
   unif_size = buf_len / (divisor * num_queues);
 
-  fprintf(stderr, "sending buffer with length %u, tag %x, %d chunks\n", buf_len, tag, unif_size);
-
   for (int i = 0; i < buf_len; i += unif_size) {
     uint32_t actual_size = min(unif_size, buf_len - i);
     char* headered_block = (char*) malloc(sizeof(struct data_block)
@@ -116,7 +112,6 @@ void multiplex_write_queues(struct queue** queues, int num_queues,
 	   (void*) &(buffer[i]), actual_size);
     write_block_to_queue(queues[i % num_queues], headered_block,
 			 sizeof(struct data_block) + actual_size);
-    fprintf(stderr, "data block first 4 bytes: %u\n", *(uint32_t *)headered_block);
   }
 }
 
