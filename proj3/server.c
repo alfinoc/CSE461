@@ -36,6 +36,9 @@ int main(int argc, char** argv) {
   // seed randomness
   srand(time(NULL));
 
+  //delete test file
+  remove(test_output);
+
   int first_port = atoi(argv[1]);
 
   // set up the perminant udp server
@@ -55,7 +58,7 @@ int main(int argc, char** argv) {
     
 
   while (1) {
-    printf("waiting for incoming udp packet...\n");
+    printf("waiting for udp handshake...\n");
     
     // prepare arg for new client thread
     arg = (struct client_info*) malloc(sizeof(struct client_info));
@@ -68,7 +71,6 @@ int main(int argc, char** argv) {
                            (sockaddr_t) &client_addr, main_sockfd, 0);
     arg->num_conn = ntohl(arg->num_conn);
 
-    printf("RECEIVED UDP %d: %c%c..\n", rec_size, *(char*)&(arg->num_conn), *((char*)&(arg->num_conn) + 1));
 
     if (rec_size == 0)
       continue;
@@ -87,8 +89,6 @@ int main(int argc, char** argv) {
     arg->sock_fd = bind_random_port(&tcp_servaddr, SOCK_STREAM);
     arg->sock_port = ntohs(tcp_servaddr.sin_port);
     
-    fprintf(stderr, "handling on port %d\n", arg->sock_port);
-
     send_udp((char *)&tcp_servaddr.sin_port, 2,
 	     &client_addr, main_sockfd);
 
@@ -123,22 +123,20 @@ void* serve_client(void* arg) {
     pthread_create(&thread, NULL, multiplex_reader_init, (void *) h_init);
   }
 
-  // accept connections -> new threads?
-
   return NULL;
 }
 
 void send_buffer(char* buffer, uint32_t buffer_len, void* arg) {
-  FILE* file = fopen(test_output, "w+");
+  FILE* file = fopen(test_output, "a");
   if (file == NULL) {
     fprintf(stderr, "error opening output file\n");
     free(buffer);
     return;
   }
 
+  printf("writing %u bytes to %s...\n", buffer_len, test_output);
   fwrite(buffer, 1, buffer_len, file);
-
-  fprintf(stderr, "CALLED BACK FOR A BUFFER! BUFFER LEN %u\n", buffer_len);
+  fclose(file);
   free(buffer);
 }
 

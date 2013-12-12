@@ -14,8 +14,8 @@
 #include "multiplex_standards.h"
 #include "queue.h"
 
-char* test_input = "testin.dat";
-char* test_output = "testout.dat";
+char* test_input = "client_testin.dat";
+char* test_output = "client_testout.dat";
 
 uint32_t udp_handshake(char* serv_address, uint32_t udp_port, int num_conn);
 

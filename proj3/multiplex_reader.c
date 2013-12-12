@@ -1,3 +1,4 @@
+
 #include "multiplex_reader.h"
 #include "utils.h"
 #include <stdbool.h>
@@ -25,7 +26,7 @@ void listen_for_block(struct mp_reader_init* params);
 void handle_block(HashTable ht, char* block, struct mp_reader_init* arg);
 void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg);
 void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg);
-void send_buffer(void* buffer, uint32_t buffer_size, struct mp_reader_init* arg);
+//void send_buffer(void* buffer, uint32_t buffer_size, struct mp_reader_init* arg);
 int recieve_tcp_block(char* buf, int buf_len, int sockfd, int timeout);
 
 void *multiplex_reader_init(void *arg) {
@@ -37,14 +38,17 @@ void *multiplex_reader_init(void *arg) {
 
 void listen_for_block(struct mp_reader_init* arg) {
   int max_size = BLOCK_SIZE + sizeof(struct data_block);
-  char *block = malloc(max_size);
-
-  fprintf(stderr, "waiting for block on tcp %d, size %d\n", arg->client_fd, max_size);
   int ret;
   while(true) {
+    char *block = (char *)malloc(max_size);
+
     ret = recieve_tcp_block(block, max_size, arg->client_fd, 0);
-    fprintf(stderr, "got block with ret %d\n", ret);
     // 0 is EOF, the client probably closed the connection
+    if (ret == -1) {
+      fprintf(stderr, "error on read! panicc\n");
+      return;
+    }
+
     if (ret == 0) {
       fprintf(stderr, "closing fd %d\n", arg->client_fd);
       close(arg->client_fd);
@@ -71,17 +75,18 @@ int recieve_tcp_block(char* buf, int buf_len, int sockfd, int timeout) {
   // read in at least the first 4 bytes to learn the chunk size
   while (index < sizeof(block_size)) {
     ret = read(sockfd, &buf[index], sizeof(block_size) - index);
+    if (ret == -1)
+      fprintf(stderr, "read returned error (fd %d): %s\n", sockfd, strerror(errno));
     if (ret < 1)
       return ret;
     index += ret;
   }
   block_size = *(uint32_t*)buf;
-  if (block_size > buf_len) {
-    fprintf(stderr, "buffer not long enough to receive a block!\n");
-  }
   // read in the rest of the chunk
   while (index < block_size) {
     ret = read(sockfd, &buf[index], block_size - index);
+    if (ret == -1)
+      fprintf(stderr, "read returned error (fd %d): %s\n", sockfd, strerror(errno));
     if (ret < 1)
       return ret;
     index += ret;
@@ -113,6 +118,7 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
     new_buf->prev_tag = init->prev_tag;
     new_buf->last_block = init->last_block;
     new_buf->buffer_size = init->buffer_size;
+    new_buf->next_tag = NO_TAG;
     
     if (!suc) {
       // add to the hash table
@@ -134,41 +140,38 @@ void handle_block(HashTable ht, char* block, struct mp_reader_init* arg) {
       pthread_mutex_unlock(&new_buf->mutex);
     }
   } else {
-    struct data_block* buffer_data = (struct data_block*) head;
+    struct data_block* buffer_data = (struct data_block*) block;
+
+    uint32_t data_size = buffer_data->block_size - sizeof(struct data_block);
 
     // this must be data for an existing buffer    
     HTKeyValue buffer_kv;
 
     while(LookupHashTable(ht, buffer_data->tag, &buffer_kv) != 1) {
       sleep(1);
-      fprintf(stderr, "buffer not found in the hash table! spinning..\n");
     }
     
     // we found the buffer object, thank god
     struct buffer_info* buffer = (struct buffer_info*) buffer_kv.value;
    
-    memcpy(&buffer->buffer[buffer_data->seq_number], &block[sizeof(buffer_data)], buffer_data->block_size);
+    memcpy(&buffer->buffer[buffer_data->seq_number], &block[sizeof(struct data_block)], data_size);
 
-    pthread_mutex_lock(&buffer->mutex);
-    buffer->n_written += buffer_data->block_size;
+    pthread_mutex_lock(&buffer->mutex);    
+    
+    buffer->n_written += data_size;
     uint32_t n_written = buffer->n_written;
     pthread_mutex_unlock(&buffer->mutex);
-    
-    if(n_written > buffer->buffer_size) {
-      fprintf(stderr, "OVERFILLED BUFFER! buffer size %u n_written %u\n", buffer->buffer_size, n_written);
-    }
     if(n_written == buffer->buffer_size) {
       buffer->completed = true;
       handle_finished_buffer_prev(ht, buffer_kv, arg);
-    }
+    }    
   }
 }
 
 void handle_finished_buffer_prev(HashTable ht, HTKeyValue buffer_kv, struct mp_reader_init* arg) {
   struct buffer_info* done = (struct buffer_info*) buffer_kv.value;
-  fprintf(stderr, "there's a completed buffer of size %u. life is good\n", done->buffer_size);
 
-  if (done->prev_tag != 0) {
+  if (done->prev_tag != NO_TAG) {
     // we have a dependancy
     HTKeyValue prev_buffer_kv;
     struct buffer_info* prev_buffer;
@@ -223,8 +226,6 @@ void handle_finished_buffer_next(HashTable ht, HTKeyValue buffer_kv, struct mp_r
  done:
   //free
   RemoveFromHashTable(ht, buffer->tag, &buffer_kv);
-  free(buffer);
-  printf("we freed a buffer!\n");
  zombie:
   // we can't free since someone still might care that the packet was read
   buffer->sent = true;
