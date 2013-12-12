@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <semaphore.h>
-
+#include <pthread.h>
 #include "queue.h"
 
 // allocates pointer to a newly allocated queue, exiting on malloc failure
@@ -18,6 +18,8 @@ struct queue* allocate_queue() {
 
   // initialize lock
   sem_init(&q->wrt, 0, 1);
+  pthread_mutex_init(&q->mutex, 0);
+  pthread_cond_init(&q->cv, 0);
 
   return q;
 }

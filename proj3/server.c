@@ -158,8 +158,10 @@ void bounce_buffer(char* buffer, uint32_t buffer_len, void* bb_arg) {
 
   printf("BOUNCING BUFFER OF SIZE %u BACK!\n", buffer_len);
 
+  int next_tag = -1;
+
   //send the buffer back!
-  multiplex_write_queues(queues, n_queues, buffer, buffer_len);
+  multiplex_write_queues(queues, n_queues, buffer, buffer_len, &next_tag);
 
   free(buffer);
 }

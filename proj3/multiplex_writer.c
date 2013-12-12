@@ -28,7 +28,6 @@ void fill_queue(char* buf, int len, struct queue* q);
 int listen_for_blocks(struct mp_writer_init* arg);
 int min(int n, int m);
 
-int next_tag = -1;
 
 void *multiplex_writer_init(void* arg) {
   struct mp_writer_init* init_params = (struct mp_writer_init*) arg;
@@ -70,9 +69,9 @@ void write_block_to_queue(struct queue* queue, char* block, int block_size) {
 
 // split up the buffer into blocks and distribute them among the queues
 void multiplex_write_queues(struct queue** queues, int num_queues,
-			    char* buffer, int buf_len) {
-  int prev_tag = next_tag;
-  int tag = ++next_tag;
+			   char* buffer, int buf_len, int *next_tag) {
+  int prev_tag = *next_tag;
+  int tag = ++(*next_tag);
   
   struct init_block* init = (struct init_block*) malloc(sizeof(struct init_block));
   init->flag = -1;

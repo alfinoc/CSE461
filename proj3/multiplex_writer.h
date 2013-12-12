@@ -14,6 +14,6 @@ struct mp_writer_init {
 void *multiplex_writer_init(void* arg);
 
 void multiplex_write_queues(struct queue** queues, int num_queues,
-			    char* buffer, int buf_len);
+			    char* buffer, int buf_len, int* next_tag);
 
 #endif

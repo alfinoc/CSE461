@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
   test_writing(queues, num_conn);
 
   //wait to exit so things can send
-  sleep(60);
+  sleep(600);
 }
 
 void save_buffer(char* buffer, uint32_t buffer_len, void* arg) {
@@ -102,8 +102,9 @@ void test_writing(struct queue** queues, int num_queues) {
   int buffer_size = 210000;
   char buffer[buffer_size];
 
+  int next_tag = -1;
   int read_size = fread(buffer, 1, buffer_size, file);
-  multiplex_write_queues(queues, num_queues, buffer, read_size);
+  multiplex_write_queues(queues, num_queues, buffer, read_size, &next_tag);
 
   /*
   int read_size;
