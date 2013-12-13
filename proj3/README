@@ -44,17 +44,17 @@ Transmission Process (Client -> Server)
 2. Server prepares a HashTable that stores a mapping from above tag to
    corresponding buffer, and creates _n_ threads to read from distinct TCP 
    connections. When a block arrives, one of the follow occurs.
-	 (a) If the block is a buffer initialization block described above, then a
-	     new entry in the HashTable is created, keyed by the block tag.
-	 (b) If the block is a data block, then its tag is looked up in the
-	     HashTable, and its payload is added to the appropriate byte index in
-	     the buffer.
-	 (c) If the block completes its buffer, then that buffer either:
-	  	 i.  has some dependency, a previous buffer that either exists already
-	  	     in the HashTable or hasn't arrived. If the latter is true, the
-	  	     buffer is initialized as in (a) and we wait for it to complete.
-	     ii. has no dependencies, and so is immediately returned if it has no
-	   		 other buffers waiting on it and is otherwise held in the table.
+      (a) If the block is a buffer initialization block described above, then a
+          new entry in the HashTable is created, keyed by the block tag.
+      (b) If the block is a data block, then its tag is looked up in the
+          HashTable, and its payload is added to the appropriate byte index in
+          the buffer.
+      (c) If the block completes its buffer, then that buffer either:
+          i.  has some dependency, a previous buffer that either exists already
+              in the HashTable or hasn't arrived. If the latter is true, the
+              buffer is initialized as in (a) and we wait for it to complete.
+          ii. has no dependencies, and so is immediately returned if it has no
+              other buffers waiting on it and is otherwise held in the table.
 
 Bounce Back Test
    Our and client and server executables perform one round trip of
