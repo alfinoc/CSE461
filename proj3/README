@@ -1,10 +1,10 @@
 1.
 
 In the project, we addressed the challenge of transmitting data between a client
-and server simultanously using multiple NICs on both machines. For instance, a
-client with both a wireless and an ethernet NIC (each of which may have a
-capped bandwidth) could connect on both NICs and send and receive data on each
-at the same time, speeding up overall transmission.
+and server simultanously using multiple NICs (and potentially multiple networks) on
+both machines. For instance, a client with both a wireless and an ethernet NIC 
+(each of which may have a capped bandwidth) could connect on both NICs and send
+and receive data on each at the same time, speeding up overall transmission.
 
 2.
 
@@ -17,22 +17,31 @@ extra work from scratch), we plan to build in this functionality at a later date
 Our completed work represents implementation of a complex process described
 below. We were able to successfully develop initialization protocols and
 procedures for splitting apart and recombining blocks of data sent on multiple
-connections with limited guarantees about the order in which blocks were
+connections with guarantees about the order in which blocks were
 received and sent.
+
+The current implementation transmits a file from the client to the server and
+back over multiple TCP connections in parallel on multiple NICs. While we will
+not be able to demo the ability to connect over multiple NICs, this is due to
+limitations in our development environment (Linux isn't playing nice), not
+our application. Our application supports binding to a NICs as originally
+intended.
 
 3.
 
 Initializing a Client-Server Connection
 1. Client sends Server a single UDP packet containing _n_, the number of TCP
    connections it would like to open to the Server.
-2. The Server replies a single port to connect to.
+2. The Server replies with a single UDP packet containing the port of a TCP
+   server socket.
+3. Client and Server establish _n_ TCP connections on that port.
 
 Initializing Client -> Server Transmission
-   Client breaks buffer-to-send into _b_ blocks, each of a capped size. Each
-   block is padded with a header field containing: 
+   Client breaks buffer-to-send into _b_ blocks, each of a capped size. With each
+   block is included a header field containing: 
 	 * a tag common to all blocks for a given buffer
-	 * the byte index of that block in the buffer
-	 * the size of that payload
+	 * the starting byte index of that block in the buffer
+	 * the total size of that payload, including header
    and sends a initialization packet via TCP to the server containing the tag,
    the tag of the previous buffer sent, size information, and a flag to indicate
    whether this is the last buffer in the message.
@@ -41,7 +50,7 @@ Transmission Process (Client -> Server)
 1. Client distributes all _b_ headered-blocks among _n_ thread-safe queues and
    creates _n_ threads. Each worker thread waits for their queue to be non-empty,
    dequeuing and sending available blocks on each's open TCP connection.
-2. Server prepares a HashTable that stores a mapping from above tag to
+2. Server prepares a hash table that stores a mapping from above tag to
    corresponding buffer, and creates _n_ threads to read from distinct TCP 
    connections. When a block arrives, one of the follow occurs.
       (a) If the block is a buffer initialization block described above, then a
@@ -63,4 +72,25 @@ Bounce Back Test
    utilize the multiplexing writer and reader interfaces.
 
 4.
+Our first design decision was to write the project purely in C, mostly for speed
+advantages and bit-level manipulations. We used the C pthread library to allow for
+using multiple TCP connections in parallel, reading and writing to the same socket in
+parallel, and serving multiple clients at once. The enormous parallelism (up to 12
+threads for one client with two NICs) made the C very tricky to debug at times,
+and we had to make liberal use of synchonization primatives as well as build our
+own thread-safe data structures.
+
+The most tricky part of the protocol was making sure that data was returned to the
+user in the original order. Although TCP guarentees in-order delivery, multiple TCP
+connections make no such guarentee. That means that we often see data arive before
+that data's buffer information has been sent, or an entire buffer arive before the
+buffer before it. Getting this behavior to work was very complicated (especially
+in a multithreaded, networked environment) and required many hard design decisions.
+
+We designed an ordering algorithm that was provisioned for each case that might appear
+in the network. For example, to prevent the server from reading buffers out of order,
+the client is required to send the ID of the previous buffer with every buffer. Before
+the server reads a buffer, it checks to make sure that the previous one has arrived.
+We designed a number of similar failsafe mechanisms for other potential network
+behaviors.
 
