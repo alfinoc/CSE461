@@ -1,0 +1,66 @@
+1.
+
+In the project, we addressed the challenge of transmitting data between a client
+and server simultanously using multiple NICs on both machines. For instance, a
+client with both a wireless and an ethernet NIC (each of which may have a
+capped bandwidth) could connect on both NICs and send and receive data on each
+at the same time, speeding up overall transmission.
+
+2.
+
+To make this program and protocol useful in practice, it would be necessary to
+build a proxy that would translate data from applications on the client machine
+to the blocks used in our protocol. While implementing such a proxy was beyond
+the scope of the project up to this point (we simply didn't have time to do this
+extra work from scratch), we plan to build in this functionality at a later date.
+
+Our completed work represents implementation of a complex process described
+below. We were able to successfully develop initialization protocols and
+procedures for splitting apart and recombining blocks of data sent on multiple
+connections with limited guarantees about the order in which blocks were
+received and sent.
+
+3.
+
+Initializing a Client-Server Connection
+1. Client sends Server a single UDP packet containing _n_, the number of TCP
+   connections it would like to open to the Server.
+2. The Server replies a single port to connect to.
+
+Initializing Client -> Server Transmission
+   Client breaks buffer-to-send into _b_ blocks, each of a capped size. Each
+   block is padded with a header field containing: 
+	 * a tag common to all blocks for a given buffer
+	 * the byte index of that block in the buffer
+	 * the size of that payload
+   and sends a initialization packet via TCP to the server containing the tag,
+   the tag of the previous buffer sent, size information, and a flag to indicate
+   whether this is the last buffer in the message.
+
+Transmission Process (Client -> Server)
+1. Client distributes all _b_ headered-blocks among _n_ thread-safe queues and
+   creates _n_ threads. Each worker thread waits for their queue to be non-empty,
+   dequeuing and sending available blocks on each's open TCP connection.
+2. Server prepares a HashTable that stores a mapping from above tag to
+   corresponding buffer, and creates _n_ threads to read from distinct TCP 
+   connections. When a block arrives, one of the follow occurs.
+      (a) If the block is a buffer initialization block described above, then a
+          new entry in the HashTable is created, keyed by the block tag.
+      (b) If the block is a data block, then its tag is looked up in the
+          HashTable, and its payload is added to the appropriate byte index in
+          the buffer.
+      (c) If the block completes its buffer, then that buffer either:
+          i.  has some dependency, a previous buffer that either exists already
+              in the HashTable or hasn't arrived. If the latter is true, the
+              buffer is initialized as in (a) and we wait for it to complete.
+          ii. has no dependencies, and so is immediately returned if it has no
+              other buffers waiting on it and is otherwise held in the table.
+
+Bounce Back Test
+   Our and client and server executables perform one round trip of
+   transmission; the client transmits a data file to the server, which then
+   answers back with the same data. This means that both the client and server
+   utilize the multiplexing writer and reader interfaces.
+
+4.
+
