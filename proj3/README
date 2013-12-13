@@ -1,12 +1,24 @@
 1.
 
-In the project, we addressed the challenge of transmitting data between a client and server simultanously using multiple NICs on both machines. For instance, a client with both a wireless and an ethernet NIC (each of which may have a capped bandwidth) could connect on both NICs and send and receive data on each at the same time, speeding up overall transmission.
+In the project, we addressed the challenge of transmitting data between a client
+and server simultanously using multiple NICs on both machines. For instance, a
+client with both a wireless and an ethernet NIC (each of which may have a
+capped bandwidth) could connect on both NICs and send and receive data on each
+at the same time, speeding up overall transmission.
 
 2.
 
-To make this program and protocol useful in practice, it would be necessary to build a proxy that would translate data from applications on the client machine to the blocks used in our protocol. While implementing such a proxy was beyond the scope of the project up to this point (we simply didn't have time to do this extra work from scratch), we plan to build in this functionality at a later date.
+To make this program and protocol useful in practice, it would be necessary to
+build a proxy that would translate data from applications on the client machine
+to the blocks used in our protocol. While implementing such a proxy was beyond
+the scope of the project up to this point (we simply didn't have time to do this
+extra work from scratch), we plan to build in this functionality at a later date.
 
-Our completed work represents implementation of a complex process described below. We were able to successfully develop initialization protocols and procedures for splitting apart and recombining blocks of data sent on multiple connections with limited guarantees about the order in which blocks were received and sent.
+Our completed work represents implementation of a complex process described
+below. We were able to successfully develop initialization protocols and
+procedures for splitting apart and recombining blocks of data sent on multiple
+connections with limited guarantees about the order in which blocks were
+received and sent.
 
 3.
 
