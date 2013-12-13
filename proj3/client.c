@@ -14,6 +14,8 @@
 #include "multiplex_standards.h"
 #include "queue.h"
 
+#include <sys/time.h>
+
 char* test_input = "client_testin.dat";
 char* test_output = "client_testout.dat";
 
@@ -36,7 +38,7 @@ int main(int argc, char** argv) {
 
   uint32_t tcp_port = udp_handshake(serv_address, udp_port, num_conn);
 
-  fprintf(stderr, "handshake successful, using tcp port %u\n", tcp_port);
+  fprintf(stdout, "handshake successful, using tcp port %u\n", tcp_port);
 
   struct sockaddr_in servaddr;
   struct mp_writer_init* writer_init;
@@ -77,6 +79,8 @@ int main(int argc, char** argv) {
 }
 
 void save_buffer(char* buffer, uint32_t buffer_len, void* arg) {
+  // fprintf(stderr, "Finished receiving data. Time %f.\n", get_time());
+
   FILE* file = fopen(test_output, "a");
  
   if (file == NULL) {
@@ -85,10 +89,11 @@ void save_buffer(char* buffer, uint32_t buffer_len, void* arg) {
     return;
   }
 
-  printf("writing %u bytes to %s...\n", buffer_len, test_output);
   fwrite(buffer, 1, buffer_len, file);
   fclose(file);
   free(buffer);
+
+  exit(0);
 }
 
 void test_writing(struct queue** queues, int num_queues) {
@@ -104,6 +109,10 @@ void test_writing(struct queue** queues, int num_queues) {
 
   int next_tag = -1;
   int read_size = fread(buffer, 1, buffer_size, file);
+
+  set_time();
+  // fprintf(stderr, "Sending data. Time %f.\n", get_time());
+
   multiplex_write_queues(queues, num_queues, buffer, read_size, &next_tag);
 
   /*
@@ -112,8 +121,6 @@ void test_writing(struct queue** queues, int num_queues) {
     multiplex_write_queues(queues, num_queues, buffer, read_size);
   }
   */
-  
-  
 
   fclose(file);  /* close the file prior to exiting the routine */
 }

@@ -8,6 +8,25 @@
 #include <string.h>
 #include <arpa/inet.h>
 
+#include <sys/time.h>
+
+struct timeval start_time;
+
+void set_time() {
+  gettimeofday(&start_time, NULL);
+}
+
+double get_time() {
+  struct timeval end_time;
+  gettimeofday(&end_time, NULL);
+
+  double time;
+  time = (end_time.tv_sec - start_time.tv_sec);
+  time += (end_time.tv_usec - start_time.tv_usec) / 1000.0;
+
+  return time;
+}
+
 int send_udp(char* mesg, int len, sockaddr_t sock_addr, int sockfd) {
   int ret = sendto(sockfd, (void*)mesg, (size_t)len, 0,
                    (struct sockaddr *) sock_addr, sizeof(*sock_addr));
@@ -72,7 +91,7 @@ int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd, char* 
   servaddr->sin_addr.s_addr = inet_addr(addr);
   servaddr->sin_port=htons(port);
 
-  fprintf(stderr, "attempting to connect on port %x...", port);
+  fprintf(stdout, "attempting to connect on port %x...", port);
 
   if (nic_addr != NULL) {
     struct sockaddr_in client_addr;
@@ -95,7 +114,7 @@ int open_tcp(char* addr, uint32_t port, sockaddr_t servaddr, int* sockfd, char* 
     if (ret == -1)
       fprintf(stderr, "error: %s... ", strerror(errno));
   } while (ret == -1);
-  fprintf(stderr, "connected.\n");
+  fprintf(stdout, "connected.\n");
 
   return ret;
 }
